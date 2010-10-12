@@ -148,31 +148,31 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Registers
-	reg	[7:0]	STEP_RATE;				// step rate in units of 500us
-	reg	[7:0]	DRIVE_CONTROL;			// Disc drive control register
+	reg	[7:0]		STEP_RATE;				// step rate in units of 500us
+	reg	[7:0]		DRIVE_CONTROL;			// Disc drive control register
 
-	reg	[1:0]	ACQCON_MFM_CLKSEL;	// MFM decoder clock select
+	reg	[1:0]		ACQCON_MFM_CLKSEL;	// MFM decoder clock select
 
-	reg	[2:0]	ACQ_START_MASK;		// Acquisition start mode
-	reg	[4:0]	ACQ_START_NUM;			// Number of start events before acq starts
-	reg	[2:0]	ACQ_STOP_MASK;			// Acquisition stop mode
-	reg	[4:0]	ACQ_STOP_NUM;			// Number of stop events before acq ends
+	reg	[2:0]		ACQ_START_MASK;		// Acquisition start mode
+	reg	[4:0]		ACQ_START_NUM;			// Number of start events before acq starts
+	reg	[2:0]		ACQ_STOP_MASK;			// Acquisition stop mode
+	reg	[4:0]		ACQ_STOP_NUM;			// Number of stop events before acq ends
 	
-	reg [7:0]	HSTMD_THRESH_START;	// HSTMD threshold, start event
-	reg [7:0]	HSTMD_THRESH_STOP;	// HSTMD threshold, stop  event
+	reg	[7:0]		HSTMD_THRESH_START;	// HSTMD threshold, start event
+	reg	[7:0]		HSTMD_THRESH_STOP;	// HSTMD threshold, stop  event
 	
-	reg [15:0]	MFM_SYNCWORD_START;	// MFM sync word, start event
-	reg [15:0]	MFM_SYNCWORD_STOP;	// MFM sync word, stop  event
+	reg	[15:0]	MFM_SYNCWORD_START;	// MFM sync word, start event
+	reg	[15:0]	MFM_SYNCWORD_STOP;	// MFM sync word, stop  event
 
 // Nets for status register bits
-	wire SR_R_EMPTY, SR_R_FULL;		// Empty/full flags from address counter
-	wire SR_FDS_STEPPING;				// =1 if stepping controller is stepping
-												// SR = Status Register
-												// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
-												// STEPPING = (take a wild guess...)
+	wire SR_R_EMPTY, SR_R_FULL;			// Empty/full flags from address counter
+	wire SR_FDS_STEPPING;					// =1 if stepping controller is stepping
+													// SR = Status Register
+													// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
+													// STEPPING = (take a wild guess...)
 	
-	wire ACQSTAT_WAITING;				// Acquisition engine waiting for event
-	wire ACQSTAT_ACQUIRING;				// Acquisition engine acquiring data
+	wire ACQSTAT_WAITING;					// Acquisition engine waiting for event
+	wire ACQSTAT_ACQUIRING;					// Acquisition engine acquiring data
 
 
 /////////////////////////////////////////////////////////////////////////////
