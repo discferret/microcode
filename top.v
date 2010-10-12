@@ -62,8 +62,9 @@ module top(
 	/// Clocks
 	input					CLOCK;
 
-/////////////////////////////////////////////////////////////////////////////
 
+/////////////////////////////////////////////////////////////////////////////
+// Unused I/O pins
 /*
 	assign SRAM_A = 19'd0;
 	assign SRAM_DQ = 8'hZZ;
@@ -79,13 +80,14 @@ module top(
 	assign FD_STEP = 1'b1;
 	assign FD_SIDESEL = 1'b1;
 */
-	assign FD_WRDATA = 1'b1;
-	assign FD_WRGATE = 1'b1;
+	assign	FD_WRDATA	= 1'b1;
+	assign	FD_WRGATE	= 1'b1;
 
-	assign HSIO_PORT = 4'd0;
+	assign	HSIO_PORT	= 4'd0;
 
 	// SRAM -- chip select, etc.
-	assign	SRAM_CE_n = 1'b0;
+	assign	SRAM_CE_n	= 1'b0;
+
 
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
@@ -135,16 +137,15 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Registers
-	reg	[7:0]	STEP_RATE;			// step rate in units of 500us
-	reg	[8:0]	DRIVE_CONTROL;		// Disc drive control register
+	reg	[7:0]	STEP_RATE;				// step rate in units of 500us
+	reg	[7:0]	DRIVE_CONTROL;			// Disc drive control register
 
-	reg			ACQCON_MUX;			// ACQCON mux bit
 	reg	[1:0]	ACQCON_MFM_CLKSEL;	// MFM decoder clock select
 
 	reg	[2:0]	ACQ_START_MASK;		// Acquisition start mode
-	reg	[4:0]	ACQ_START_NUM;		// Number of start events before acq starts
-	reg	[2:0]	ACQ_STOP_MASK;		// Acquisition stop mode
-	reg	[4:0]	ACQ_STOP_NUM;		// Number of stop events before acq ends
+	reg	[4:0]	ACQ_START_NUM;			// Number of start events before acq starts
+	reg	[2:0]	ACQ_STOP_MASK;			// Acquisition stop mode
+	reg	[4:0]	ACQ_STOP_NUM;			// Number of stop events before acq ends
 	
 	reg [7:0]	HSTMD_THRESH_START;	// HSTMD threshold, start event
 	reg [7:0]	HSTMD_THRESH_STOP;	// HSTMD threshold, stop  event
@@ -154,21 +155,21 @@ module top(
 
 // Nets for status register bits
 	wire SR_R_EMPTY, SR_R_FULL;		// Empty/full flags from address counter
-	wire SR_FDS_STEPPING;			// =1 if stepping controller is stepping
-									// SR = Status Register
-									// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
-									// STEPPING = (take a wild guess...)
+	wire SR_FDS_STEPPING;				// =1 if stepping controller is stepping
+												// SR = Status Register
+												// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
+												// STEPPING = (take a wild guess...)
 	
-	wire ACQSTAT_WAITING;			// Acquisition engine waiting for event
-	wire ACQSTAT_ACQUIRING;			// Acquisition engine acquiring data
+	wire ACQSTAT_WAITING;				// Acquisition engine waiting for event
+	wire ACQSTAT_ACQUIRING;				// Acquisition engine acquiring data
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Microcontroller interface
 
 // Hi-Z logic for SPP
-// When OESPP=1, DIO should be O/P  (FPGA is writing).
-// When OESPP=0, DIO should be Hi-Z (PIC  is writing).
+// When PMRD=1, DIO should be O/P  (FPGA is writing).
+// When PMRD=0, DIO should be Hi-Z (PIC  is writing).
 	reg[7:0]	MCU_PMD_OUT;
 	assign MCU_PMD = MCU_PMRD ? MCU_PMD_OUT : 8'hZZ;
 
@@ -186,76 +187,75 @@ module top(
 // Handle host interface reads and writes
 	always @(posedge MCU_PMWR) begin
 		/// Register Write
-		case (MCU_ADDR)
-			4'h0,
-			4'h1,
-			4'h2:	 begin			// SRAM_ADDR_{LOW,HIGH,UPPER}
+		case (MCU_ADDR[7:0])
+			8'h00,
+			8'h01,
+			8'h02: begin			// SRAM_ADDR_{LOW,HIGH,UPPER}
 						// Note: other logic for this state below.
 						SYNC_WRITE_REG <= MCU_PMD;
 					 end
-			4'h3:	 begin			// SRAM_DATA_LOW
+
+			8'h03: begin			// SRAM_DATA_LOW
 						SRAM_DATA_OUT[7:0] <= MCU_PMD;
 					 end
-			4'h4:	 begin			// DRIVE_CONTROL_LOW
+
+			8'h04: begin			// DRIVE_CONTROL_LOW
 						DRIVE_CONTROL[7:0] <= MCU_PMD;
 					 end
-			4'h5:	 begin			// DRIVE_CONTROL_HIGH
-						DRIVE_CONTROL[8] <= MCU_PMD[0];
-					 end
-			4'h6:	 begin
-						// ACQCON -- these bits are handled elsewhere
-						//    bit 0 = START
-						//    bit 1 = ABORT
 
-						// Bit  7:   Register select / mux bit for acquisition engine
-						// Bits 6,5: MFM clock select bits
-						{ACQCON_MUX, ACQCON_MFM_CLKSEL} <= MCU_PMD[7:5];
+			8'h05: begin
+						// ACQCON
+						//    bit 0 = START  \__ handled elsewhere
+						//    bit 1 = ABORT  /
+						// Bits 7,6: MFM clock select bits
+						ACQCON_MFM_CLKSEL <= MCU_PMD[7:6];
 					 end
-			4'h7:	 begin			// ACQ_START_EVT / ACQ_STOP_EVT
-						if (ACQCON_MUX) begin
-							// Load the acq start counter and mask
-							{ACQ_START_MASK, ACQ_START_NUM} <= MCU_PMD;
-						end else begin
-							// Load the acq stop counter and mask
-							{ACQ_STOP_MASK, ACQ_STOP_NUM} <= MCU_PMD;
-						end
+
+			8'h06: begin			// ACQ_START_EVT
+						// Load the acq start counter and mask
+						{ACQ_START_MASK, ACQ_START_NUM} <= MCU_PMD;
 					 end
-			4'h8:	 begin			// ACQ_HSTMD_THR_START / ACQ_HSTMD_THR_STOP
-						if (ACQCON_MUX) begin
-							// Load HSTMD start threshold
-							HSTMD_THRESH_START <= MCU_PMD;
-						end else begin
-							// Load HSTMD stop threshold
-							HSTMD_THRESH_STOP <= MCU_PMD;
-						end
+
+			8'h07: begin			// ACQ_STOP_EVT
+						// Load the acq stop counter and mask
+						{ACQ_STOP_MASK, ACQ_STOP_NUM} <= MCU_PMD;
 					 end
-			4'h9:	 begin			// MFM_SYNCWORD_START_H / MFM_SYNCWORD_STOP_H
-						if (ACQCON_MUX) begin
-							MFM_SYNCWORD_START[15:8] <= MCU_PMD;
-						end else begin
-							MFM_SYNCWORD_START[7:0] <= MCU_PMD;
-						end
+
+			8'h08: begin			// ACQ_HSTMD_THR_START
+						// Load HSTMD start threshold
+						HSTMD_THRESH_START <= MCU_PMD;
 					 end
-			4'hA:	 begin			// MFM_SYNCWORD_START_L / MFM_SYNCWORD_STOP_L
-						if (ACQCON_MUX) begin
-							MFM_SYNCWORD_STOP[15:8] <= MCU_PMD;
-						end else begin
-							MFM_SYNCWORD_STOP[7:0] <= MCU_PMD;
-						end
+
+ 			8'h09: begin			// ACQ_HSTMD_THR_STOP
+						// Load HSTMD stop threshold
+						HSTMD_THRESH_STOP <= MCU_PMD;
 					 end
-/*				4'hB:	 begin
+
+			8'h0A: begin			// MFM_SYNCWORD_START_L
+						MFM_SYNCWORD_START[7:0] <= MCU_PMD;
 					 end
-			4'hC:	 begin
+
+ 			8'h0B: begin			// MFM_SYNCWORD_START_H
+						MFM_SYNCWORD_START[15:8] <= MCU_PMD;
 					 end
-			4'hD:	 begin
+
+			8'h0C: begin			// MFM_SYNCWORD_STOP_L
+						MFM_SYNCWORD_STOP[7:0] <= MCU_PMD;
 					 end
-*/				4'hE:	 begin			// STEP_RATE -- Disc drive step rate
+
+			8'h0D: begin			// MFM_SYNCWORD_STOP_H
+						MFM_SYNCWORD_STOP[15:8] <= MCU_PMD;
+					 end
+
+			8'h0E: begin			// STEP_RATE -- Disc drive step rate
 						STEP_RATE <= MCU_PMD;
 					 end
-			4'hF:	 begin			// STEP_CMD  -- Disc drive step command
+
+			8'h0F: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
 						SYNC_WRITE_REG <= MCU_PMD;
 					 end
+
 			default: begin
 					 end
 		endcase
@@ -263,33 +263,33 @@ module top(
 
 	// Multiplexer for readback (MCU_PMD_OUT)
 	always @(*) begin
-		case (MCU_ADDR)
-			4'h0:	MCU_PMD_OUT = SRAM_A[7:0];				// SRAM_ADDR_LOW
-			4'h1:	MCU_PMD_OUT = SRAM_A[15:8];			// SRAM_ADDR_HIGH
-			4'h2:	MCU_PMD_OUT = {5'b00000, SRAM_A[18:16]};	// SRAM_ADDR_UPPER
-			4'h3:	MCU_PMD_OUT = SRAM_DQ[7:0];			// SRAM_DATA_LOW
-			4'h4:	MCU_PMD_OUT = MCO_TYPE[15:8];			// Microcode type high
-			4'h5:	MCU_PMD_OUT = MCO_TYPE[7:0];			// Microcode type low
-			4'h6:	MCU_PMD_OUT = MCO_VERSION[15:8];		// Microcode version high
-			4'h7:	MCU_PMD_OUT = MCO_VERSION[7:0];		// Microcode version low
-/*			4'h8:	 begin
-					 end
-			4'h9:	 begin
-					 end
-			4'hA:	 begin
-					 end
-			4'hB:	 begin
-					 end
-			4'hC:	 begin
-					 end
-			4'hD:	 begin
-					 end
-*/			4'hE:	 MCU_PMD_OUT =			// STATUS1 register
-						{6'b0, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
-			4'hF:	 MCU_PMD_OUT =			// STATUS2 register
-						{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
-						 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
-			default: MCU_PMD_OUT = 8'b0;
+		case (MCU_ADDR[7:0])
+			8'h00:	MCU_PMD_OUT = SRAM_A[7:0];						// SRAM_ADDR_LOW
+			8'h01:	MCU_PMD_OUT = SRAM_A[15:8];					// SRAM_ADDR_HIGH
+			8'h02:	MCU_PMD_OUT = {5'b00000, SRAM_A[18:16]};	// SRAM_ADDR_UPPER
+			8'h03:	MCU_PMD_OUT = SRAM_DQ[7:0];					// SRAM_DATA_LOW
+			8'h04:	MCU_PMD_OUT = MCO_TYPE[7:0];					// Microcode type low
+			8'h05:	MCU_PMD_OUT = MCO_TYPE[15:8];					// Microcode type high
+			8'h06:	MCU_PMD_OUT = MCO_VERSION[7:0];				// Microcode version low
+			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
+/*			8'h08:	begin
+						end
+			8'h09:	begin
+						end
+			8'h0A:	begin
+						end
+			8'h0B:	begin
+						end
+			8'h0C:	begin
+						end
+			8'h0D:	begin
+						end
+*/			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
+							{6'b0, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
+			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
+							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
+							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
+			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
 
@@ -307,7 +307,7 @@ module top(
 	reg [1:0] MWC_CUR_STATE;
 	
 	// Valid MWC states
-	parameter MWC_S_IDLE		= 2'b00;		// Idle (waiting for write)
+	parameter MWC_S_IDLE			= 2'b00;		// Idle (waiting for write)
 	parameter MWC_S_WRITE		= 2'b01;		// Writing to RAM
 	parameter MWC_S_INCADDR		= 2'b10;		// Increment address
 
@@ -375,7 +375,7 @@ module top(
 	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC && MCU_PMRD);
 
 	AddressCounter addr_count(
-		CLOCK,				// Master clock
+		CLOCK,					// Master clock
 		SRAM_A,					// SRAM address output
 		SRA_INCREMENT,			// Increment input
 		SR_R_EMPTY,				// Empty flag (status register read)
@@ -390,11 +390,11 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // Disc drive interface
 
-	assign FD_DENS_OUT	= ~DRIVE_CONTROL[1];
-	assign FD_INUSE		= ~DRIVE_CONTROL[2];
-	assign FD_DRVSEL	= ~DRIVE_CONTROL[6:3];
-	assign FD_MOTEN		= ~DRIVE_CONTROL[7];
-	assign FD_SIDESEL	= ~DRIVE_CONTROL[8];
+	assign FD_DENS_OUT	= ~DRIVE_CONTROL[0];
+	assign FD_INUSE		= ~DRIVE_CONTROL[1];
+	assign FD_DRVSEL		= ~DRIVE_CONTROL[5:2];
+	assign FD_MOTEN		= ~DRIVE_CONTROL[6];
+	assign FD_SIDESEL		= ~DRIVE_CONTROL[7];
 
 /////////////////////////////////////////////////////////////////////////////
 // Stepping rate generator
@@ -450,10 +450,10 @@ module top(
 	// Clock-synchronised Start and Abort signals -- derived from writes to ACQCON
 	wire ACQCON_START_sync, ACQCON_ABORT_sync;
 	Flag_CrossDomain _fcd_write_acqcon_start(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h6) && (MCU_PMD[0] == 1'b1),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[0] == 1'b1),
 					CLOCK, ACQCON_START_sync);
 	Flag_CrossDomain _fcd_write_acqcon_abort(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h6) && (MCU_PMD[1] == 1'b1),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[1] == 1'b1),
 					CLOCK, ACQCON_ABORT_sync);
 
 	// Acquisition control unit
