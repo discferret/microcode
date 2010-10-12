@@ -38,7 +38,7 @@
 
 set_global_assignment -name FAMILY "Cyclone II"
 set_global_assignment -name DEVICE EP2C8T144C8
-set_global_assignment -name TOP_LEVEL_ENTITY ate
+set_global_assignment -name TOP_LEVEL_ENTITY top
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 10.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "02:09:34  SEPTEMBER 06, 2010"
 set_global_assignment -name LAST_QUARTUS_VERSION 10.0
@@ -115,11 +115,6 @@ set_global_assignment -name VERILOG_FILE AddressCounter.v
 set_global_assignment -name VERILOG_FILE top.v
 set_global_assignment -name VERILOG_FILE MFMSyncWordDetector.v
 set_global_assignment -name VERILOG_FILE StepController.v
-set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
-set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
-set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
-set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
-set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
 set_location_assignment PIN_114 -to FD_DENS_OUT
 set_location_assignment PIN_71 -to MCU_PMALH
 set_location_assignment PIN_72 -to MCU_PMALL
@@ -133,4 +128,13 @@ set_location_assignment PIN_57 -to MCU_PMD[3]
 set_location_assignment PIN_55 -to MCU_PMD[2]
 set_location_assignment PIN_53 -to MCU_PMD[1]
 set_location_assignment PIN_48 -to MCU_PMD[0]
+set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
+set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_location_assignment PIN_73 -to HSIO_PORT[3]
+set_location_assignment PIN_74 -to HSIO_PORT[2]
+set_location_assignment PIN_75 -to HSIO_PORT[1]
+set_location_assignment PIN_76 -to HSIO_PORT[0]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top
