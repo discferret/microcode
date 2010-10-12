@@ -4,7 +4,7 @@
 // MODULE: altpll 
 
 // ============================================================
-// File Name: DatasepClockGen.v
+// File Name: ClockGenerator.v
 // Megafunction Name(s):
 // 			altpll
 //
@@ -36,22 +36,26 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module DatasepClockGen (
+module ClockGenerator (
 	inclk0,
-	c0);
+	c0,
+	c1);
 
 	input	  inclk0;
 	output	  c0;
+	output	  c1;
 
 	wire [5:0] sub_wire0;
-	wire [0:0] sub_wire4 = 1'h0;
+	wire [0:0] sub_wire5 = 1'h0;
+	wire [1:1] sub_wire2 = sub_wire0[1:1];
 	wire [0:0] sub_wire1 = sub_wire0[0:0];
 	wire  c0 = sub_wire1;
-	wire  sub_wire2 = inclk0;
-	wire [1:0] sub_wire3 = {sub_wire4, sub_wire2};
+	wire  c1 = sub_wire2;
+	wire  sub_wire3 = inclk0;
+	wire [1:0] sub_wire4 = {sub_wire5, sub_wire3};
 
 	altpll	altpll_component (
-				.inclk (sub_wire3),
+				.inclk (sub_wire4),
 				.clk (sub_wire0),
 				.activeclock (),
 				.areset (1'b0),
@@ -93,10 +97,14 @@ module DatasepClockGen (
 		altpll_component.clk0_duty_cycle = 50,
 		altpll_component.clk0_multiply_by = 8,
 		altpll_component.clk0_phase_shift = "0",
+		altpll_component.clk1_divide_by = 1,
+		altpll_component.clk1_duty_cycle = 50,
+		altpll_component.clk1_multiply_by = 2,
+		altpll_component.clk1_phase_shift = "0",
 		altpll_component.compensate_clock = "CLK0",
 		altpll_component.inclk0_input_frequency = 50000,
 		altpll_component.intended_device_family = "Cyclone II",
-		altpll_component.lpm_hint = "CBX_MODULE_PREFIX=DatasepClockGen",
+		altpll_component.lpm_hint = "CBX_MODULE_PREFIX=ClockGenerator",
 		altpll_component.lpm_type = "altpll",
 		altpll_component.operation_mode = "NORMAL",
 		altpll_component.port_activeclock = "PORT_UNUSED",
@@ -125,7 +133,7 @@ module DatasepClockGen (
 		altpll_component.port_scanread = "PORT_UNUSED",
 		altpll_component.port_scanwrite = "PORT_UNUSED",
 		altpll_component.port_clk0 = "PORT_USED",
-		altpll_component.port_clk1 = "PORT_UNUSED",
+		altpll_component.port_clk1 = "PORT_USED",
 		altpll_component.port_clk2 = "PORT_UNUSED",
 		altpll_component.port_clk3 = "PORT_UNUSED",
 		altpll_component.port_clk4 = "PORT_UNUSED",
@@ -163,10 +171,13 @@ endmodule
 // Retrieval info: PRIVATE: CREATE_INCLK1_CHECK STRING "0"
 // Retrieval info: PRIVATE: CUR_DEDICATED_CLK STRING "c0"
 // Retrieval info: PRIVATE: CUR_FBIN_CLK STRING "c0"
-// Retrieval info: PRIVATE: DEVICE_SPEED_GRADE STRING "Any"
+// Retrieval info: PRIVATE: DEVICE_SPEED_GRADE STRING "8"
 // Retrieval info: PRIVATE: DIV_FACTOR0 NUMERIC "1"
+// Retrieval info: PRIVATE: DIV_FACTOR1 NUMERIC "1"
 // Retrieval info: PRIVATE: DUTY_CYCLE0 STRING "50.00000000"
+// Retrieval info: PRIVATE: DUTY_CYCLE1 STRING "50.00000000"
 // Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE0 STRING "32.000000"
+// Retrieval info: PRIVATE: EFF_OUTPUT_FREQ_VALUE1 STRING "40.000000"
 // Retrieval info: PRIVATE: EXPLICIT_SWITCHOVER_COUNTER STRING "0"
 // Retrieval info: PRIVATE: EXT_FEEDBACK_RADIO STRING "0"
 // Retrieval info: PRIVATE: GLOCKED_COUNTER_EDIT_CHANGED STRING "1"
@@ -187,18 +198,26 @@ endmodule
 // Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE STRING "Not Available"
 // Retrieval info: PRIVATE: LVDS_MODE_DATA_RATE_DIRTY NUMERIC "0"
 // Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT0 STRING "deg"
+// Retrieval info: PRIVATE: LVDS_PHASE_SHIFT_UNIT1 STRING "deg"
 // Retrieval info: PRIVATE: MIG_DEVICE_SPEED_GRADE STRING "Any"
 // Retrieval info: PRIVATE: MIRROR_CLK0 STRING "0"
+// Retrieval info: PRIVATE: MIRROR_CLK1 STRING "0"
 // Retrieval info: PRIVATE: MULT_FACTOR0 NUMERIC "1"
+// Retrieval info: PRIVATE: MULT_FACTOR1 NUMERIC "1"
 // Retrieval info: PRIVATE: NORMAL_MODE_RADIO STRING "1"
 // Retrieval info: PRIVATE: OUTPUT_FREQ0 STRING "32.00000000"
+// Retrieval info: PRIVATE: OUTPUT_FREQ1 STRING "40.00000000"
 // Retrieval info: PRIVATE: OUTPUT_FREQ_MODE0 STRING "1"
+// Retrieval info: PRIVATE: OUTPUT_FREQ_MODE1 STRING "1"
 // Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT0 STRING "MHz"
+// Retrieval info: PRIVATE: OUTPUT_FREQ_UNIT1 STRING "MHz"
 // Retrieval info: PRIVATE: PHASE_RECONFIG_FEATURE_ENABLED STRING "0"
 // Retrieval info: PRIVATE: PHASE_RECONFIG_INPUTS_CHECK STRING "0"
 // Retrieval info: PRIVATE: PHASE_SHIFT0 STRING "0.00000000"
+// Retrieval info: PRIVATE: PHASE_SHIFT1 STRING "0.00000000"
 // Retrieval info: PRIVATE: PHASE_SHIFT_STEP_ENABLED_CHECK STRING "0"
 // Retrieval info: PRIVATE: PHASE_SHIFT_UNIT0 STRING "deg"
+// Retrieval info: PRIVATE: PHASE_SHIFT_UNIT1 STRING "deg"
 // Retrieval info: PRIVATE: PLL_ADVANCED_PARAM_CHECK STRING "0"
 // Retrieval info: PRIVATE: PLL_ARESET_CHECK STRING "0"
 // Retrieval info: PRIVATE: PLL_AUTOPLL_CHECK NUMERIC "1"
@@ -210,7 +229,7 @@ endmodule
 // Retrieval info: PRIVATE: PLL_PFDENA_CHECK STRING "0"
 // Retrieval info: PRIVATE: PLL_TARGET_HARCOPY_CHECK NUMERIC "0"
 // Retrieval info: PRIVATE: PRIMARY_CLK_COMBO STRING "inclk0"
-// Retrieval info: PRIVATE: RECONFIG_FILE STRING "DatasepClockGen.mif"
+// Retrieval info: PRIVATE: RECONFIG_FILE STRING "ClockGenerator.mif"
 // Retrieval info: PRIVATE: SACN_INPUTS_CHECK STRING "0"
 // Retrieval info: PRIVATE: SCAN_FEATURE_ENABLED STRING "0"
 // Retrieval info: PRIVATE: SELF_RESET_LOCK_LOSS STRING "0"
@@ -222,11 +241,14 @@ endmodule
 // Retrieval info: PRIVATE: SPREAD_USE STRING "0"
 // Retrieval info: PRIVATE: SRC_SYNCH_COMP_RADIO STRING "0"
 // Retrieval info: PRIVATE: STICKY_CLK0 STRING "1"
+// Retrieval info: PRIVATE: STICKY_CLK1 STRING "1"
 // Retrieval info: PRIVATE: SWITCHOVER_COUNT_EDIT NUMERIC "1"
 // Retrieval info: PRIVATE: SWITCHOVER_FEATURE_ENABLED STRING "1"
 // Retrieval info: PRIVATE: SYNTH_WRAPPER_GEN_POSTFIX STRING "0"
 // Retrieval info: PRIVATE: USE_CLK0 STRING "1"
+// Retrieval info: PRIVATE: USE_CLK1 STRING "1"
 // Retrieval info: PRIVATE: USE_CLKENA0 STRING "0"
+// Retrieval info: PRIVATE: USE_CLKENA1 STRING "0"
 // Retrieval info: PRIVATE: USE_MIL_SPEED_GRADE NUMERIC "0"
 // Retrieval info: PRIVATE: ZERO_DELAY_RADIO STRING "0"
 // Retrieval info: LIBRARY: altera_mf altera_mf.altera_mf_components.all
@@ -234,6 +256,10 @@ endmodule
 // Retrieval info: CONSTANT: CLK0_DUTY_CYCLE NUMERIC "50"
 // Retrieval info: CONSTANT: CLK0_MULTIPLY_BY NUMERIC "8"
 // Retrieval info: CONSTANT: CLK0_PHASE_SHIFT STRING "0"
+// Retrieval info: CONSTANT: CLK1_DIVIDE_BY NUMERIC "1"
+// Retrieval info: CONSTANT: CLK1_DUTY_CYCLE NUMERIC "50"
+// Retrieval info: CONSTANT: CLK1_MULTIPLY_BY NUMERIC "2"
+// Retrieval info: CONSTANT: CLK1_PHASE_SHIFT STRING "0"
 // Retrieval info: CONSTANT: COMPENSATE_CLOCK STRING "CLK0"
 // Retrieval info: CONSTANT: INCLK0_INPUT_FREQUENCY NUMERIC "50000"
 // Retrieval info: CONSTANT: INTENDED_DEVICE_FAMILY STRING "Cyclone II"
@@ -265,7 +291,7 @@ endmodule
 // Retrieval info: CONSTANT: PORT_SCANREAD STRING "PORT_UNUSED"
 // Retrieval info: CONSTANT: PORT_SCANWRITE STRING "PORT_UNUSED"
 // Retrieval info: CONSTANT: PORT_clk0 STRING "PORT_USED"
-// Retrieval info: CONSTANT: PORT_clk1 STRING "PORT_UNUSED"
+// Retrieval info: CONSTANT: PORT_clk1 STRING "PORT_USED"
 // Retrieval info: CONSTANT: PORT_clk2 STRING "PORT_UNUSED"
 // Retrieval info: CONSTANT: PORT_clk3 STRING "PORT_UNUSED"
 // Retrieval info: CONSTANT: PORT_clk4 STRING "PORT_UNUSED"
@@ -283,18 +309,18 @@ endmodule
 // Retrieval info: USED_PORT: @clk 0 0 6 0 OUTPUT_CLK_EXT VCC "@clk[5..0]"
 // Retrieval info: USED_PORT: @extclk 0 0 4 0 OUTPUT_CLK_EXT VCC "@extclk[3..0]"
 // Retrieval info: USED_PORT: c0 0 0 0 0 OUTPUT_CLK_EXT VCC "c0"
+// Retrieval info: USED_PORT: c1 0 0 0 0 OUTPUT_CLK_EXT VCC "c1"
 // Retrieval info: USED_PORT: inclk0 0 0 0 0 INPUT_CLK_EXT GND "inclk0"
 // Retrieval info: CONNECT: @inclk 0 0 1 1 GND 0 0 0 0
 // Retrieval info: CONNECT: @inclk 0 0 1 0 inclk0 0 0 0 0
 // Retrieval info: CONNECT: c0 0 0 0 0 @clk 0 0 1 0
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen.v TRUE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen.ppf TRUE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen.inc FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen.cmp FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen.bsf FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen_inst.v FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen_bb.v FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen_waveforms.html FALSE
-// Retrieval info: GEN_FILE: TYPE_NORMAL DatasepClockGen_wave*.jpg FALSE
+// Retrieval info: CONNECT: c1 0 0 0 0 @clk 0 0 1 1
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator.v TRUE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator.ppf TRUE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator.inc FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator.cmp FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator.bsf FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator_inst.v FALSE
+// Retrieval info: GEN_FILE: TYPE_NORMAL ClockGenerator_bb.v FALSE
 // Retrieval info: LIB_FILE: altera_mf
 // Retrieval info: CBX_MODULE_PREFIX: ON

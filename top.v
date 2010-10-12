@@ -83,7 +83,7 @@ module top(
 	assign	FD_WRDATA	= 1'b1;
 	assign	FD_WRGATE	= 1'b1;
 
-	assign	HSIO_PORT	= 4'd0;
+	assign	HSIO_PORT	= 4'dZ;
 
 	// SRAM -- chip select, etc.
 	assign	SRAM_CE_n	= 1'b0;
@@ -92,8 +92,13 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // Clock generation
 	// Instantiate a PLL to convert from 40MHz to 32MHz
-	wire CLK_PLL32MHZ;
-	DatasepClockGen dscg(CLOCK, CLK_PLL32MHZ);
+	wire CLK_PLL32MHZ, CLK_MASTER;
+	ClockGenerator clkgen(
+		.inclk0	(CLOCK),
+		.c0		(CLK_PLL32MHZ),				// 32MHz PLL clock
+		.c1		(CLK_MASTER)					// Master clock (40MHz as standard)
+		);
+
 
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
@@ -107,7 +112,7 @@ module top(
 	reg status_led_r;
 	assign STATUS_LED = status_led_r;
 
-	always @(posedge CLOCK) begin
+	always @(posedge CLK_MASTER) begin
 		if (status_led_counter > 32'd20_000_000) begin
 			status_led_counter <= 32'd0;
 			status_led_r <= ~status_led_r;
@@ -321,10 +326,10 @@ module top(
 	wire MWC_WRITE_SRAM_DATA;
 	Flag_CrossDomain _fcd_write_sram_data(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h3),
-					CLOCK, MWC_WRITE_SRAM_DATA);
+					CLK_MASTER, MWC_WRITE_SRAM_DATA);
 
 	// MWC State machine
-	always @(posedge CLOCK) begin
+	always @(posedge CLK_MASTER) begin
 		case (MWC_CUR_STATE)
 			MWC_S_IDLE:		begin
 								// S_IDLE: Idle state. Write bit inactive.
@@ -363,25 +368,25 @@ module top(
 	wire WRITE_SRAM_ADDR_U, WRITE_SRAM_ADDR_H, WRITE_SRAM_ADDR_L;
 	Flag_CrossDomain _fcd_write_sram_addr_l(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h0),
-					CLOCK, WRITE_SRAM_ADDR_L);
+					CLK_MASTER, WRITE_SRAM_ADDR_L);
 	Flag_CrossDomain _fcd_write_sram_addr_h(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h1),
-					CLOCK, WRITE_SRAM_ADDR_H);
+					CLK_MASTER, WRITE_SRAM_ADDR_H);
 	Flag_CrossDomain _fcd_write_sram_addr_u(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h2),
-					CLOCK, WRITE_SRAM_ADDR_U);
+					CLK_MASTER, WRITE_SRAM_ADDR_U);
 
 	// Sync the READ_DATA signal as well
 	wire READ_SRAM_DATA_REG_SYNC;
 	Flag_CrossDomain _fcd_read_sram_data_reg(
 					MCU_PMRD, MCU_PMRD && (MCU_ADDR == 4'h3),
-					CLOCK, READ_SRAM_DATA_REG_SYNC);
+					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
 
 	// SRAM address should increment after an SRAM read or write operation.
 	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC && MCU_PMRD);
 
 	AddressCounter addr_count(
-		CLOCK,					// Master clock
+		CLK_MASTER,					// Master clock
 		SRAM_A,					// SRAM address output
 		SRA_INCREMENT,			// Increment input
 		SR_R_EMPTY,				// Empty flag (status register read)
@@ -405,10 +410,10 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // Stepping rate generator
 
-// Clock divider to produce 250us pulses from CLOCK
+// Clock divider to produce 250us pulses from CLK_MASTER
 	reg [15:0] master_clk_counter;
 	reg STEP_GEN_MASTER_CLK;
-	always @(posedge CLOCK) begin
+	always @(posedge CLK_MASTER) begin
 		if (master_clk_counter != 16'd5000) begin
 			master_clk_counter <= master_clk_counter + 16'd1;
 		end else begin
@@ -436,9 +441,9 @@ module top(
 	wire WRITE_STEP_REG;
 	Flag_CrossDomain _fcd_write_step_reg(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'hF),
-					CLOCK, WRITE_STEP_REG);
+					CLK_MASTER, WRITE_STEP_REG);
 	StepController stepper(
-		CLOCK,
+		CLK_MASTER,
 		STEP_CLK,
 		1'b0,	/// TODO: connect to main reset
 		SYNC_WRITE_REG,
@@ -457,15 +462,15 @@ module top(
 	wire ACQCON_START_sync, ACQCON_ABORT_sync;
 	Flag_CrossDomain _fcd_write_acqcon_start(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[0] == 1'b1),
-					CLOCK, ACQCON_START_sync);
+					CLK_MASTER, ACQCON_START_sync);
 	Flag_CrossDomain _fcd_write_acqcon_abort(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[1] == 1'b1),
-					CLOCK, ACQCON_ABORT_sync);
+					CLK_MASTER, ACQCON_ABORT_sync);
 
 	// Acquisition control unit
 	AcquisitionControl _acqcontrol(
 		.CLK_32MHZ				(CLK_PLL32MHZ),
-		.CLK_MASTER				(CLOCK),
+		.CLK_MASTER				(CLK_MASTER),
 		.CLK_250US				(STEP_GEN_MASTER_CLK),
 		.DATASEP_CLKSEL		(ACQCON_MFM_CLKSEL),
 		.START					(ACQCON_START_sync),
@@ -488,7 +493,7 @@ module top(
 
 	// Data Acquisition Module
 	DiscReader _discreader(
-		.CLOCK					(CLOCK),
+		.CLOCK					(CLK_MASTER),
 		.RUN						(ACQSTAT_ACQUIRING),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.FD_INDEX_IN			(FD_INDEX_IN),
