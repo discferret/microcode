@@ -24,7 +24,7 @@ module top(
 	MCU_PMALH, MCU_PMALL, 						/* MCU address load signals		*/
 	MCU_PMRD, MCU_PMWR,							/* MCU read and write				*/
 	STATUS_LED,										/* Status LED							*/
-	CLOCK												/* 20MHz clock							*/
+	CLOCK												/* 20MHz main clock					*/
 	);
 
 	///// Declare inputs and outputs
@@ -88,6 +88,12 @@ module top(
 	// SRAM -- chip select, etc.
 	assign	SRAM_CE_n	= 1'b0;
 
+	
+/////////////////////////////////////////////////////////////////////////////
+// Clock generation
+	// Instantiate a PLL to convert from 40MHz to 32MHz
+	wire CLK_PLL32MHZ;
+	DatasepClockGen dscg(CLOCK, CLK_PLL32MHZ);
 
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
@@ -458,8 +464,9 @@ module top(
 
 	// Acquisition control unit
 	AcquisitionControl _acqcontrol(
-		.CLK40MHZ				(CLOCK),
-		.CLK250US				(STEP_GEN_MASTER_CLK),
+		.CLK_32MHZ				(CLK_PLL32MHZ),
+		.CLK_MASTER				(CLOCK),
+		.CLK_250US				(STEP_GEN_MASTER_CLK),
 		.DATASEP_CLKSEL		(ACQCON_MFM_CLKSEL),
 		.START					(ACQCON_START_sync),
 		.ABORT					(ACQCON_ABORT_sync),

@@ -1,6 +1,7 @@
 module AcquisitionControl(
-	CLK40MHZ,
-	CLK250US,
+	CLK_32MHZ,
+	CLK_MASTER,
+	CLK_250US,
 	DATASEP_CLKSEL,
 	START, ABORT,
 	FD_INDEX_IN,
@@ -18,24 +19,25 @@ module AcquisitionControl(
 	debug
 );
 
-	input			CLK40MHZ;				// 40MHz master clock
-	input			CLK250US;				// 250us-per-cycle clock
-	input	[1:0]	DATASEP_CLKSEL;			// Data separator clock select bits
-	input			START, ABORT;			// START and ABORT register bits
-	input			FD_INDEX_IN;			// INDEX pulse, +ve active
-	input			FD_RDDATA_IN;			// DATA READ from FDD, +ve active
-	input			SR_R_FULL;				// RAM full (1=true)
-	input	[2:0]	ACQ_START_MASK;			// Starting event mask
-	input	[4:0]	ACQ_START_NUM;			// Number of start events req'd
-	input	[2:0]	ACQ_STOP_MASK;			// Stopping event mask
-	input	[4:0]	ACQ_STOP_NUM;			// Number of stop events req'd
-	input	[7:0]	HSTMD_THRESH_START;		// Threshold for Start Event HSTMD
-	input	[7:0]	HSTMD_THRESH_STOP;		// Threshold for Stop Event HSTMD
-	input	[15:0]	MFM_SYNCWORD_START;		// MFM Syncword for starting acq
-	input	[15:0]	MFM_SYNCWORD_STOP;		// MFM Syncword for stopping acq
+	input					CLK_32MHZ;					// 32MHz data-separator clock
+	input					CLK_MASTER;					// Master clock
+	input					CLK_250US;					// 250us-per-cycle clock
+	input		[1:0]		DATASEP_CLKSEL;			// Data separator clock select bits
+	input					START, ABORT;				// START and ABORT register bits
+	input					FD_INDEX_IN;				// INDEX pulse, +ve active
+	input					FD_RDDATA_IN;				// DATA READ from FDD, +ve active
+	input					SR_R_FULL;					// RAM full (1=true)
+	input		[2:0]		ACQ_START_MASK;			// Starting event mask
+	input		[4:0]		ACQ_START_NUM;				// Number of start events req'd
+	input		[2:0]		ACQ_STOP_MASK;				// Stopping event mask
+	input		[4:0]		ACQ_STOP_NUM;				// Number of stop events req'd
+	input		[7:0]		HSTMD_THRESH_START;		// Threshold for Start Event HSTMD
+	input		[7:0]		HSTMD_THRESH_STOP;		// Threshold for Stop Event HSTMD
+	input		[15:0]	MFM_SYNCWORD_START;		// MFM Syncword for starting acq
+	input		[15:0]	MFM_SYNCWORD_STOP;		// MFM Syncword for stopping acq
 
-	output	WAITING;						// Status o/p: waiting for trigger
-	output	ACQUIRING;						// Status o/p: acquiring
+	output	WAITING;									// Status o/p: waiting for trigger
+	output	ACQUIRING;								// Status o/p: acquiring
 	
 	output	[3:0]	debug;
 
@@ -44,24 +46,20 @@ module AcquisitionControl(
 // Track-mark detectors
 
 	// Divide 250us clock from step-rate counter down to 500us
-	reg CLK500US;
-	always @(posedge CLK250US) CLK500US <= ~CLK500US;
+	reg CLK_500US;
+	always @(posedge CLK_250US) CLK_500US <= ~CLK_500US;
 
 	wire HSTMD_START_EVT_DETECTED, HSTMD_STOP_EVT_DETECTED;
-	TrackMarkDetector _tmd_start(CLK500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_START, HSTMD_START_EVT_DETECTED);
-	TrackMarkDetector _tmd_stop (CLK500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_STOP,  HSTMD_STOP_EVT_DETECTED );
+	TrackMarkDetector _tmd_start(CLK_500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_START, HSTMD_START_EVT_DETECTED);
+	TrackMarkDetector _tmd_stop (CLK_500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_STOP,  HSTMD_STOP_EVT_DETECTED );
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Clock dividers and selectors for the data separator
 
-	// Instantiate a PLL to convert from 40MHz to 32MHz
-	wire CLK_PLL32MHZ;
-	DatasepClockGen dscg(CLK40MHZ, CLK_PLL32MHZ);
-
 	// Divide down the 32MHz reference to get 16MHz, 8MHz and 4MHz
 	reg [2:0] DatasepClkDiv;
-	always @(posedge CLK_PLL32MHZ) DatasepClkDiv <= DatasepClkDiv + 3'd1;
+	always @(posedge CLK_32MHZ) DatasepClkDiv <= DatasepClkDiv + 3'd1;
 
 	// Clock multiplexer
 /*	// Latch clock-select only when all clocks are low
@@ -71,18 +69,18 @@ module AcquisitionControl(
 */
 	// Select the relevant clock
 	reg DATASEP_CLK_pre;
-	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_PLL32MHZ) begin
+	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_32MHZ) begin
 		case (DATASEP_CLKSEL)
-			2'b00:		DATASEP_CLK_pre = CLK_PLL32MHZ;			// 1Mbps	(32MHz clk)
-			2'b01:		DATASEP_CLK_pre = DatasepClkDiv[0];		// 500kbps	(16MHz clk)
-			2'b10:		DATASEP_CLK_pre = DatasepClkDiv[1];		// 250kbps	(8 MHz clk)
+			2'b00:	DATASEP_CLK_pre = CLK_32MHZ;				// 1Mbps		(32MHz clk)
+			2'b01:	DATASEP_CLK_pre = DatasepClkDiv[0];		// 500kbps	(16MHz clk)
+			2'b10:	DATASEP_CLK_pre = DatasepClkDiv[1];		// 250kbps	(8 MHz clk)
 			default:	DATASEP_CLK_pre = DatasepClkDiv[2];		// 125kbps	(4 MHz clk)
 		endcase
 	end
 	
 	// Sync clock against 32MHz master clock to remove glitches
 	reg DATASEP_MASTER_CLK;
-	always @(posedge CLK_PLL32MHZ) DATASEP_MASTER_CLK <= DATASEP_CLK_pre;
+	always @(posedge CLK_32MHZ) DATASEP_MASTER_CLK <= DATASEP_CLK_pre;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -93,32 +91,32 @@ module AcquisitionControl(
 
 	// Sync-word detector for START condition
 	MFMSyncWordDetector _mfm_syncdet_start(
-		.CLK_PLL32MHZ			(CLK_PLL32MHZ),
-		.DATASEP_MASTER_CLK		(DATASEP_MASTER_CLK),
+		.CLK_PLL32MHZ			(CLK_32MHZ),
+		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(16'h4489), //(MFM_SYNCWORD_START),
-		.SYNC_WORD_DETECTED		(SYNCWD_START_EVT_DETECTED)
+		.SYNC_WORD_DETECTED	(SYNCWD_START_EVT_DETECTED)
 	);
 
 	MFMSyncWordDetector _mfm_syncdet_stop(
-		.CLK_PLL32MHZ			(CLK_PLL32MHZ),
-		.DATASEP_MASTER_CLK		(DATASEP_MASTER_CLK),
+		.CLK_PLL32MHZ			(CLK_32MHZ),
+		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(16'h4489), //(MFM_SYNCWORD_STOP),
-		.SYNC_WORD_DETECTED		(SYNCWD_STOP_EVT_DETECTED)
+		.SYNC_WORD_DETECTED	(SYNCWD_STOP_EVT_DETECTED)
 	);
 
 	// Synchronise sync-detect flags from PLL32 to CLK40
 	wire SYNCWD_START_EVT_DETECTED_sync;
 	Signal_CrossDomain_As_Flag _scdaf_syncwd_start_detected(
-		.clkA (CLK_PLL32MHZ),	.SignalIn  (SYNCWD_START_EVT_DETECTED), 
-		.clkB (CLK40MHZ),		.SignalOut (SYNCWD_START_EVT_DETECTED_sync)
+		.clkA (CLK_32MHZ),	.SignalIn  (SYNCWD_START_EVT_DETECTED), 
+		.clkB (CLK_MASTER),	.SignalOut (SYNCWD_START_EVT_DETECTED_sync)
 	);
 
 	wire SYNCWD_STOP_EVT_DETECTED_sync;
 	Signal_CrossDomain_As_Flag _scdaf_syncwd_stop_detected(
-		.clkA (CLK_PLL32MHZ),	.SignalIn  (SYNCWD_STOP_EVT_DETECTED), 
-		.clkB (CLK40MHZ),		.SignalOut (SYNCWD_STOP_EVT_DETECTED_sync)
+		.clkA (CLK_32MHZ),	.SignalIn  (SYNCWD_STOP_EVT_DETECTED), 
+		.clkB (CLK_MASTER),	.SignalOut (SYNCWD_STOP_EVT_DETECTED_sync)
 	);
 
 assign debug={
@@ -137,15 +135,15 @@ assign debug={
 	// Sync index pulse to clk40MHZ
 	wire FD_INDEX_IN_sync;
 	Signal_CrossDomain_As_Flag _scdaf_fd_index(
-		.clkA (CLK40MHZ),		.SignalIn  (FD_INDEX_IN),
-		.clkB (CLK40MHZ),		.SignalOut (FD_INDEX_IN_sync)
+		.clkA (CLK_MASTER),		.SignalIn  (FD_INDEX_IN),
+		.clkB (CLK_MASTER),		.SignalOut (FD_INDEX_IN_sync)
 	);
 	
 	wire ACQ_STARTEVT_MATCH		=	((ACQ_START_MASK[1:0] == 2'b01) && FD_INDEX_IN_sync) ||
 									((ACQ_START_MASK[1:0] == 2'b10) && SYNCWD_START_EVT_DETECTED_sync);
 	// Delay 1tcy and limit to one clock cycle
 	wire ACQ_STARTEVT_MATCH_sync;
-	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STARTEVT_SYNC(CLK40MHZ, ACQ_STARTEVT_MATCH, ACQ_STARTEVT_MATCH_sync);
+	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STARTEVT_SYNC(CLK_MASTER, ACQ_STARTEVT_MATCH, ACQ_STARTEVT_MATCH_sync);
 
 
 	//// STOP event triggers
@@ -154,7 +152,7 @@ assign debug={
 									(SR_R_FULL);
 	// Delay 1tcy and limit to one clock cycle
 	wire ACQ_STOPEVT_MATCH_sync;
-	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STOPEVT_SYNC(CLK40MHZ, ACQ_STOPEVT_MATCH, ACQ_STOPEVT_MATCH_sync);
+	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STOPEVT_SYNC(CLK_MASTER, ACQ_STOPEVT_MATCH, ACQ_STOPEVT_MATCH_sync);
 
 	// event detection state machine
 	parameter SSFSM_S_IDLE		= 3'b000;
@@ -166,7 +164,7 @@ assign debug={
 	reg [2:0] SSFSM_CUR_STATE;
 	reg [4:0] SCOUNT, ECOUNT;
 	
-	always @(posedge CLK40MHZ) begin
+	always @(posedge CLK_MASTER) begin
 		// Abort logic -- if ABORT goes high, reset the FSM
 		if (ABORT) begin
 			SSFSM_CUR_STATE <= SSFSM_S_IDLE;
