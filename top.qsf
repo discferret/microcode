@@ -107,17 +107,14 @@ set_global_assignment -name VERILOG_FILE Flag_CrossDomain.v
 set_global_assignment -name VERILOG_FILE DataSeparator.v
 set_global_assignment -name VERILOG_FILE TrackMarkDetector.v
 set_global_assignment -name VERILOG_FILE Flag_Delay1tcy_OneCycle.v
-set_global_assignment -name VERILOG_FILE SEG7_LUT.v
 set_global_assignment -name VERILOG_FILE Signal_CrossDomain_As_Flag.v
 set_global_assignment -name VERILOG_FILE DatasepClockGen.v
 set_global_assignment -name VERILOG_FILE AcquisitionControl.v
 set_global_assignment -name VERILOG_FILE DiscReader.v
 set_global_assignment -name VERILOG_FILE AddressCounter.v
-set_global_assignment -name VERILOG_FILE SEG7_LUT_4.v
 set_global_assignment -name VERILOG_FILE top.v
 set_global_assignment -name VERILOG_FILE MFMSyncWordDetector.v
 set_global_assignment -name VERILOG_FILE StepController.v
-set_global_assignment -name VERILOG_FILE ate.v
 set_global_assignment -name LL_ROOT_REGION ON -section_id "Root Region"
 set_global_assignment -name LL_MEMBER_STATE LOCKED -section_id "Root Region"
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
