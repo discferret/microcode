@@ -1,0 +1,21 @@
+syntax: glob
+db/*
+output/*
+incremental_db/*
+*.rpt
+*.log
+*.summary
+*.bak
+*.orig
+*~
+*.done
+*.jdi
+*.smsg
+*.pin
+*.pof
+*.sof
+undo_redo.txt
+.*.sw?
+ate.v
+*.dpf
+*.rbf
