@@ -361,6 +361,7 @@ module top(
 		endcase
 	end
 
+
 /////////////////////////////////////////////////////////////////////////////
 // Memory address counter
 
@@ -398,6 +399,7 @@ module top(
 		WRITE_SRAM_ADDR_L		// Write low   address bits
 	);
 
+
 /////////////////////////////////////////////////////////////////////////////
 // Disc drive interface
 
@@ -406,6 +408,7 @@ module top(
 	assign FD_DRVSEL		= ~DRIVE_CONTROL[5:2];
 	assign FD_MOTEN		= ~DRIVE_CONTROL[6];
 	assign FD_SIDESEL		= ~DRIVE_CONTROL[7];
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Stepping rate generator
@@ -435,6 +438,7 @@ module top(
 	end
 
 	wire STEP_CLK = step_ck_div_tgl;
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Stepping controller
