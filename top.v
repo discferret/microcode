@@ -498,3 +498,5 @@ module top(
 	);
 
 endmodule
+
+// vim: ts=3 sw=3

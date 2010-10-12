@@ -6,11 +6,11 @@ module MFMSyncWordDetector(
 	SYNC_WORD_DETECTED
 );
 
-	input			CLK_PLL32MHZ;				// Master clock
-	input			DATASEP_MASTER_CLK;			// Data separator master clock
-	input			FD_RDDATA_IN;				// Floppy disc read-data in
-	input	[15:0]	SYNC_WORD_IN;				// Syncword to look for
-	output			SYNC_WORD_DETECTED;			// 1 if sync word detected
+	input					CLK_PLL32MHZ;				// Master clock
+	input					DATASEP_MASTER_CLK;		// Data separator master clock
+	input					FD_RDDATA_IN;				// Floppy disc read-data in
+	input		[15:0]	SYNC_WORD_IN;				// Syncword to look for
+	output				SYNC_WORD_DETECTED;		// 1 if sync word detected
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -50,3 +50,5 @@ module MFMSyncWordDetector(
 //	assign SYNC_WORD_DETECTED = (sync_shift_r == SYNC_WORD_IN);
 	
 endmodule
+
+// vim: ts=3 sw=3

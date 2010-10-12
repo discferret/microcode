@@ -2,12 +2,13 @@ module DataSeparator(MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 
 	input				MASTER_CLK;			// Master Clock -- Data rate * 16
 	input				FD_RDDATA_IN;		// L->H on flux transition
-	output				SHAPED_DATA;		// Reshaped data pulses
-	output				DWIN;				// Data Window
+	output			SHAPED_DATA;		// Reshaped data pulses
+	output			DWIN;					// Data Window
 
 /////////////////////////////////////////////////////////////////////////////
 // "Phase-jerked loop" data separator
 // Designed by James Thompson, Analog Innovations, Phoenix AZ.
+//   Original schematic: http://www.analog-innovations.com/SED/FloppyDataExtractor.pdf
 // Verilog implementation by Phil Pemberton
 
 	// Declare flipflops
@@ -77,3 +78,5 @@ module DataSeparator(MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 	end
 
 endmodule
+
+// vim: ts=3 sw=3

@@ -1,40 +1,33 @@
 module AddressCounter(
-		CLK,										/* Master clock					*/
-		ADDR,										/* Address outputs				*/
-		INCREMENT,									/* L->H increments address		*/
-		EMPTY, FULL,								/* Empty / Full status outputs	*/
-		RESET,										/* Reset input					*/
+		CLK,										/* Master clock						*/
+		ADDR,										/* Address outputs					*/
+		INCREMENT,								/* L->H increments address			*/
+		EMPTY, FULL,							/* Empty / Full status outputs	*/
+		RESET,									/* Reset input							*/
 		DATA,										/* Input data (used by LOAD_*)	*/
-		LOAD_U, LOAD_H, LOAD_L						/* L->H loads upper/hi/lo byte	*/
+		LOAD_U, LOAD_H, LOAD_L				/* L->H loads upper/hi/lo byte	*/
 );
 
-	// Current address
-	output reg [18:0] ADDR;
+	output reg	[18:0]	ADDR;			// Current address
+	output					EMPTY;		// EMPTY is 1 whenever ADDR == 0.
+	output reg				FULL;			// FULL is 1 if the last INCREMENT caused
+												// the address counter to roll over.
+	input						CLK;			// Master clock
+	input						INCREMENT;	// L->H edge on clock with INCREMENT=1 causes
+												// address to be incremented
+	input						RESET;		// L->H edge causes ADDR and the FULL flag
+												// to be cleared.
+	input		LOAD_U, LOAD_H, LOAD_L;	// LOAD_[UHL]: L->H edge on CLK with LOAD[UHL]=1
+												// loads contents of DATA into the upper, high
+												// or low byte of the counter register respectively.
+	input			[7:0]		DATA;			// DATA: Data that is loaded in by LOAD_[UHL].
 
-	/// Empty/Full status
-	// EMPTY is 1 whenever ADDR == 0.
-	// FULL is 1 if the last INCREMENT caused the address counter to roll over.
-	output		EMPTY;
-	output reg	FULL;
-
-	/// Control inputs
-	// CLK: Reference clock
-	input		CLK;
-	
-	// INCREMENT: L->H edge on clock with INCREMENT=1 causes address to increment
-	input		INCREMENT;
-	// RESET: L->H edge causes ADDR and the FULL flag  to be cleared.
-	input		RESET;
-	// LOAD_[UHL]: L->H edge on CLK with LOAD[UHL]=1 loads contents of DATA into the
-	//				upper, high or low byte of the counter register respectively.
-	input		LOAD_U, LOAD_H, LOAD_L;
-	// DATA: Data that is loaded in by LOAD_[UHL].
-	input [7:0]	DATA;
-	
-	/// EMPTY output logic
+/////////////////////////////////////////////////////////////////////////////
+// EMPTY output logic
 	assign EMPTY = (ADDR == 0) && (!FULL);
-	
-	/// Counting logic
+
+/////////////////////////////////////////////////////////////////////////////
+// Counting logic
 	always @(posedge CLK or posedge RESET) begin
 		if (RESET) begin
 			// Reset -- clear ADDR to 0 and clear FULL flag
@@ -65,3 +58,5 @@ module AddressCounter(
 		end
 	end
 endmodule
+
+// vim: ts=3 sw=3

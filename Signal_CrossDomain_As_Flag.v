@@ -12,12 +12,12 @@ module Signal_CrossDomain_As_Flag(
     clkB, SignalOut);
 
 // clkA domain signals
-input clkA;
-input SignalIn;
+	input clkA;
+	input SignalIn;
 
 // clkB domain signals
-input clkB;
-output SignalOut;
+	input clkB;
+	output SignalOut;
 
 /*
 /// This code is from fpga4fun.com and doesn't "quite" work right...
@@ -31,11 +31,13 @@ always @(posedge clkB) SyncA_clkB[1] <= SyncA_clkB[0]; // notice that we use clk
 assign SignalOut = SyncA_clkB[1];  // new signal synchronized to (=ready to be used in) clkB domain
 */
 
-reg [1:0] SrA;
-reg outbuf;
+	reg [1:0] SrA;
+	reg outbuf;
 
-always @(posedge clkA) SrA <= {SrA[0], SignalIn};
-always @(posedge clkB) outbuf <= (SrA[0] && !SrA[1]);
-assign SignalOut = outbuf;
+	always @(posedge clkA) SrA <= {SrA[0], SignalIn};
+	always @(posedge clkB) outbuf <= (SrA[0] && !SrA[1]);
+	assign SignalOut = outbuf;
 
 endmodule
+
+// vim: ts=3 sw=3

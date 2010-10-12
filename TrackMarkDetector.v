@@ -3,13 +3,14 @@
  */
 
 module TrackMarkDetector(clock, reset, index, threshold, detect);
-	input				clock;			// clock input, positive-edge-triggered
-	input				reset;			// reset input, positive-edge-triggered
-	input				index;			// index pulse input, active high
-	input	[7:0]		threshold;		// threshold value
+	input					clock;			// clock input, positive-edge-triggered
+	input					reset;			// reset input, positive-edge-triggered
+	input					index;			// index pulse input, active high
+	input		[7:0]		threshold;		// threshold value
 	output				detect;			// detection state output
 
-	// Time counter
+/////////////////////////////////////////////////////////////////////////////
+// Time counter
 	reg [7:0] timer;
 	always @(posedge clock or posedge index) begin
 		if (index) begin
@@ -18,22 +19,27 @@ module TrackMarkDetector(clock, reset, index, threshold, detect);
 			timer <= timer + 8'd1;
 		end
 	end
-	
-	// Time latch
+
+/////////////////////////////////////////////////////////////////////////////
+// Time latch
 	reg [7:0] tlatch;
 	always @(posedge index) begin
 		tlatch <= timer;
 	end
-	
-	// Track last few output states -- must see delta>threshold, THEN
-	// delta<=threshold in order to trigger. To do this, we track the
-	// previous and current index pulse states.
+
+/////////////////////////////////////////////////////////////////////////////
+// Track last few output states -- must see delta>threshold, THEN
+// delta<=threshold in order to trigger. To do this, we track the
+// previous and current index pulse states.
 	reg [1:0] prevstate;
 	always @(posedge index) begin
 		prevstate <= {prevstate[0], (tlatch <= threshold)};
 	end
-	
-	// Detect logic -- prevdelta > threshold, thisdelta <= threshold.
+
+/////////////////////////////////////////////////////////////////////////////
+// Detect logic -- prevdelta > threshold, thisdelta <= threshold.
 	assign detect = (!prevstate[1] && prevstate[0]);
 
 endmodule
+
+// vim: ts=3 sw=3

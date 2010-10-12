@@ -36,10 +36,10 @@ module AcquisitionControl(
 	input		[15:0]	MFM_SYNCWORD_START;		// MFM Syncword for starting acq
 	input		[15:0]	MFM_SYNCWORD_STOP;		// MFM Syncword for stopping acq
 
-	output	WAITING;									// Status o/p: waiting for trigger
-	output	ACQUIRING;								// Status o/p: acquiring
+	output				WAITING;						// Status o/p: waiting for trigger
+	output				ACQUIRING;					// Status o/p: acquiring
 	
-	output	[3:0]	debug;
+	output	[3:0]		debug;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -246,3 +246,5 @@ assign debug={
 	assign ACQUIRING	= ((SSFSM_CUR_STATE == SSFSM_S_WAITHSACQ) || (SSFSM_CUR_STATE == SSFSM_S_ACQ));
 
 endmodule
+
+// vim: ts=3 sw=3

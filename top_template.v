@@ -129,4 +129,4 @@ module ate(
 
 endmodule
 
-// vim: ts=3
+// vim: ts=3 sw=3

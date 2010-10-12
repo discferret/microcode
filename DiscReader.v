@@ -20,21 +20,24 @@
  */
 
 module DiscReader(CLOCK, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
-	input				CLOCK;				// counter clock
-	input				RUN;				// enable input -- 1 to acquire
-	input				FD_RDDATA_IN;		// read data
-	input				FD_INDEX_IN;		// index pulse
-	input				RESET;				// asynchronous reset
+	input					CLOCK;				// counter clock
+	input					RUN;					// enable input -- 1 to acquire
+	input					FD_RDDATA_IN;		// read data
+	input					FD_INDEX_IN;		// index pulse
+	input					RESET;				// asynchronous reset
 	
-	output reg	[7:0]	DATA;				// data output to RAM
+	output reg	[7:0]	DATA;					// data output to RAM
 	output				WRITE;				// write output to RAM
 
-	// Input synchronisation
+/////////////////////////////////////////////////////////////////////////////
+// Input synchronisation
 	wire FD_RDDATA_IN_tcysync, FD_RDDATA_IN_tcysync2;
 	Flag_Delay1tcy_OneCycle _fcd_rddata1(CLOCK, FD_RDDATA_IN, FD_RDDATA_IN_tcysync);
 	Flag_Delay1tcy_OneCycle _fcd_rddata2(CLOCK, FD_RDDATA_IN_tcysync, FD_RDDATA_IN_tcysync2);
 
-	// Transition period timer
+
+/////////////////////////////////////////////////////////////////////////////
+// Transition period timer
 	wire			ResetTimer;
 	reg		[6:0]	timer;
 	always @(posedge CLOCK or posedge ResetTimer) begin
@@ -53,7 +56,9 @@ module DiscReader(CLOCK, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
 		end
 	end
 
-	/// State machine
+
+/////////////////////////////////////////////////////////////////////////////
+// State machine
 
 	// FSM states
 	parameter	ST_IDLE		= 2'd0;
@@ -117,3 +122,5 @@ module DiscReader(CLOCK, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
 	// Reset the timer in the IDLE state, when there's a transition, and when RESET is active
 	assign ResetTimer = (state == ST_IDLE) || (FD_RDDATA_IN_tcysync2) || (RESET);
 endmodule
+
+// vim ts=3 sw=3
