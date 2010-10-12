@@ -152,9 +152,19 @@ module top(
 	reg [15:0]	MFM_SYNCWORD_START;	// MFM sync word, start event
 	reg [15:0]	MFM_SYNCWORD_STOP;	// MFM sync word, stop  event
 
+// Nets for status register bits
+	wire SR_R_EMPTY, SR_R_FULL;		// Empty/full flags from address counter
+	wire SR_FDS_STEPPING;			// =1 if stepping controller is stepping
+									// SR = Status Register
+									// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
+									// STEPPING = (take a wild guess...)
+	
+	wire ACQSTAT_WAITING;			// Acquisition engine waiting for event
+	wire ACQSTAT_ACQUIRING;			// Acquisition engine acquiring data
+
 
 /////////////////////////////////////////////////////////////////////////////
-// SPP parallel port
+// Microcontroller interface
 
 // Hi-Z logic for SPP
 // When OESPP=1, DIO should be O/P  (FPGA is writing).
@@ -169,16 +179,6 @@ module top(
 		MCU_ADDRH <= MCU_PMD;
 	always @(negedge MCU_PMALL)
 		MCU_ADDRL <= MCU_PMD;
-
-// Nets for status register bits
-	wire SR_R_EMPTY, SR_R_FULL;		// Empty/full flags from address counter
-	wire SR_FDS_STEPPING;			// =1 if stepping controller is stepping
-									// SR = Status Register
-									// FDS = Floppy Drive, Stepping / Floppy Drive Subsystem
-									// STEPPING = (take a wild guess...)
-	
-	wire ACQSTAT_WAITING;			// Acquisition engine waiting for event
-	wire ACQSTAT_ACQUIRING;			// Acquisition engine acquiring data
 
 // Temporary synch register for incoming data from the MCU
 	reg [7:0] SYNC_WRITE_REG;
