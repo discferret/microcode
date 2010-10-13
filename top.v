@@ -140,7 +140,7 @@ module top(
 	
 // Bus arbitration: DAM has the write bus when ACQSTAT_WAITING or ACQSTAT_ACQUIRING
 	wire[7:0]	SRAM_DQ_WR;
-	assign		SRAM_DQ_WR	= ((ACQSTAT_ACQUIRING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : SRAM_DATA_OUT;
+	assign		SRAM_DQ_WR	= ((ACQSTAT_WAITING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : SRAM_DATA_OUT;
 
 // SRAM data bus is Hi-Z unless Write Enable is active
 	assign		SRAM_DQ		= (!SRAM_WE_n) ? SRAM_DQ_WR : 8'hzz;
@@ -325,7 +325,7 @@ module top(
 	// Synchronise input bits from other clock domains
 	wire MWC_WRITE_SRAM_DATA;
 	Flag_CrossDomain _fcd_write_sram_data(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h3),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h03),
 					CLK_MASTER, MWC_WRITE_SRAM_DATA);
 
 	// MWC State machine
@@ -367,24 +367,24 @@ module top(
 
 	// Synchronise the three WRITE_ADDR signals against the 40MHz clock
 	wire WRITE_SRAM_ADDR_U, WRITE_SRAM_ADDR_H, WRITE_SRAM_ADDR_L;
-	Flag_CrossDomain _fcd_write_sram_addr_l(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h0),
-					CLK_MASTER, WRITE_SRAM_ADDR_L);
-	Flag_CrossDomain _fcd_write_sram_addr_h(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h1),
-					CLK_MASTER, WRITE_SRAM_ADDR_H);
-	Flag_CrossDomain _fcd_write_sram_addr_u(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'h2),
-					CLK_MASTER, WRITE_SRAM_ADDR_U);
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_l(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h00),
+					WRITE_SRAM_ADDR_L);
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_h(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h01),
+					WRITE_SRAM_ADDR_H);
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_u(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h02),
+					WRITE_SRAM_ADDR_U);
 
 	// Sync the READ_DATA signal as well
 	wire READ_SRAM_DATA_REG_SYNC;
 	Flag_CrossDomain _fcd_read_sram_data_reg(
-					MCU_PMRD, MCU_PMRD && (MCU_ADDR == 4'h3),
+					MCU_PMRD, (MCU_ADDR[7:0] == 8'h03),
 					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
 
 	// SRAM address should increment after an SRAM read or write operation.
-	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC && MCU_PMRD);
+	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
 
 	AddressCounter addr_count(
 		CLK_MASTER,					// Master clock
@@ -394,9 +394,9 @@ module top(
 		SR_R_FULL,				// Full flag (status register read)
 		1'b0, //SR_W_RESET,	// Reset (status register write)
 		SYNC_WRITE_REG,		// Get data from sync-write
-		WRITE_SRAM_ADDR_U,	// Write upper address bits
-		WRITE_SRAM_ADDR_H,	// Write high  address bits
-		WRITE_SRAM_ADDR_L		// Write low   address bits
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h02),	// Write upper address bits
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h01),	// Write high  address bits
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h00)		// Write low   address bits
 	);
 
 
@@ -444,7 +444,7 @@ module top(
 // Stepping controller
 	wire WRITE_STEP_REG;
 	Flag_CrossDomain _fcd_write_step_reg(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 4'hF),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h0F),
 					CLK_MASTER, WRITE_STEP_REG);
 	StepController stepper(
 		CLK_MASTER,
@@ -465,10 +465,10 @@ module top(
 	// Clock-synchronised Start and Abort signals -- derived from writes to ACQCON
 	wire ACQCON_START_sync, ACQCON_ABORT_sync;
 	Flag_CrossDomain _fcd_write_acqcon_start(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[0] == 1'b1),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h05) && (MCU_PMD[0] == 1'b1),
 					CLK_MASTER, ACQCON_START_sync);
 	Flag_CrossDomain _fcd_write_acqcon_abort(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR == 8'h05) && (MCU_PMD[1] == 1'b1),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h05) && (MCU_PMD[1] == 1'b1),
 					CLK_MASTER, ACQCON_ABORT_sync);
 
 	// Acquisition control unit
