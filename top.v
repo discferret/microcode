@@ -83,7 +83,7 @@ module top(
 	assign	FD_WRDATA	= 1'b1;
 	assign	FD_WRGATE	= 1'b1;
 
-	assign	HSIO_PORT	= 4'dZ;
+	assign	HSIO_PORT	= 4'hZ;
 
 	// SRAM -- chip select, etc.
 	assign	SRAM_CE_n	= 1'b0;
