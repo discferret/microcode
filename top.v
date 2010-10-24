@@ -129,9 +129,6 @@ module top(
 	// Write signal from Data Acquisition (DiscReader) module
 	wire		DAM_SRAM_WR;
 
-// Output enable is active if memory is NOT being written to
-	wire		SRAM_OE_n = (!SRAM_WE_n);
-
 // Data out from the Acquisition (DiscReader) module
 	wire[7:0]	DAM_SRAM_WRITE_BUS;
 	
@@ -142,8 +139,8 @@ module top(
 	wire[7:0]	SRAM_DQ_WR;
 	assign		SRAM_DQ_WR	= ((ACQSTAT_WAITING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : SRAM_DATA_OUT;
 
-// SRAM data bus is Hi-Z unless Write Enable is active
-	assign		SRAM_DQ		= (!SRAM_WE_n) ? SRAM_DQ_WR : 8'hzz;
+// SDRAM data bus is driven by us if OE is inactive, else it's Hi-Z
+	assign		SRAM_DQ		= SRAM_OE_n ? SRAM_DQ_WR : 8'hzz;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -307,9 +304,10 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // Memory write controller
 
-	// SRAM write enable
-	reg SRAM_WE_n_r;
+	// SRAM write/output enable
+	reg SRAM_WE_n_r, SRAM_OE_n_r;
 	assign SRAM_WE_n = SRAM_WE_n_r;
+	assign SRAM_OE_n = SRAM_OE_n_r;
 	
 	// SRAM address increment
 	reg SRA_INCREMENT_MWC;
@@ -318,9 +316,10 @@ module top(
 	reg [1:0] MWC_CUR_STATE;
 	
 	// Valid MWC states
-	parameter MWC_S_IDLE			= 2'b00;		// Idle (waiting for write)
-	parameter MWC_S_WRITE		= 2'b01;		// Writing to RAM
-	parameter MWC_S_INCADDR		= 2'b10;		// Increment address
+	parameter MWC_S_IDLE			= 2'h0;		// Idle (waiting for write)
+	parameter MWC_S_OEIA			= 2'h1;		// OE Inactive (disable SRAM outputs)
+	parameter MWC_S_WRITE		= 2'h2;		// Writing to RAM
+	parameter MWC_S_INCADDR		= 2'h3;		// End write and increment address
 
 	// Synchronise input bits from other clock domains
 	wire MWC_WRITE_SRAM_DATA;
@@ -332,26 +331,33 @@ module top(
 	always @(posedge CLK_MASTER) begin
 		case (MWC_CUR_STATE)
 			MWC_S_IDLE:		begin
-								// S_IDLE: Idle state. Write bit inactive.
+								// S_IDLE: Idle state. Write bit inactive, OE active.
 								SRAM_WE_n_r			<= 1'b1;
+								SRAM_OE_n_r			<= 1'b0;
 								SRA_INCREMENT_MWC	<= 1'b0;
 
 								if ((MWC_WRITE_SRAM_DATA) || (DAM_SRAM_WR)) begin
-									MWC_CUR_STATE	<= MWC_S_WRITE;
+									MWC_CUR_STATE	<= MWC_S_OEIA;
 								end else begin
 									MWC_CUR_STATE	<= MWC_S_IDLE;
 								end
 							end
-						
+
+			MWC_S_OEIA:		begin
+								// S_OEIA: Make OE inactive
+								SRAM_OE_n_r			<= 1'b1;
+								MWC_CUR_STATE		<= MWC_S_WRITE;
+							end
+
 			MWC_S_WRITE:	begin
 								// S_WRITE: write to RAM
 								SRAM_WE_n_r			<= 1'b0;
 								SRA_INCREMENT_MWC	<= 1'b0;
 								MWC_CUR_STATE		<= MWC_S_INCADDR;
 							end
-			
+
 			MWC_S_INCADDR:	begin
-								// S_INCADDR: Increment Address
+								// S_INCADDR: End write and increment Address
 								SRAM_WE_n_r			<= 1'b1;
 								SRA_INCREMENT_MWC	<= 1'b1;
 								MWC_CUR_STATE		<= MWC_S_IDLE;
