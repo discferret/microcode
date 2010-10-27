@@ -65,24 +65,8 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Unused I/O pins
-/*
-	assign SRAM_A = 19'd0;
-	assign SRAM_DQ = 8'hZZ;
-	assign SRAM_WE_n = 1'b1;
-	assign SRAM_OE_n = 1'b0;
-	assign SRAM_CE_n = 1'b0;
-
-	assign FD_DRVSEL = 3'b000;
-	assign FD_DENS_OUT = 1'b0;
-	assign FD_INUSE = 1'b0;
-	assign FD_MOTEN = 1'b0;
-	assign FD_DIR = 1'b1;
-	assign FD_STEP = 1'b1;
-	assign FD_SIDESEL = 1'b1;
-*/
 	assign	FD_WRDATA	= 1'b1;
 	assign	FD_WRGATE	= 1'b1;
-
 	assign	HSIO_PORT	= 4'hZ;
 
 	// SRAM -- chip select, etc.
@@ -141,6 +125,117 @@ module top(
 
 // SDRAM data bus is driven by us if OE is inactive, else it's Hi-Z
 	assign		SRAM_DQ		= SRAM_OE_n ? SRAM_DQ_WR : 8'hzz;
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Memory write controller
+
+	// SRAM write/output enable
+	reg SRAM_WE_n_r, SRAM_OE_n_r;
+	assign SRAM_WE_n = SRAM_WE_n_r;
+	assign SRAM_OE_n = SRAM_OE_n_r;
+	
+	// SRAM address increment
+	reg SRA_INCREMENT_MWC;
+
+	// Current MWC state
+	reg [2:0] MWC_CUR_STATE;
+	
+	// Valid MWC states
+	parameter MWC_S_IDLE			= 3'h0;		// Idle (waiting for write)
+	parameter MWC_S_OEIA			= 3'h1;		// OE Inactive (disable SRAM outputs)
+	parameter MWC_S_WRITE		= 3'h2;		// Writing to RAM
+	parameter MWC_S_INCADDR		= 3'h3;		// End write and increment address
+	parameter MWC_S_WRITEEND	= 3'h4;
+
+	// Synchronise input bits from other clock domains
+	wire MWC_WRITE_SRAM_DATA;
+	Flag_CrossDomain _fcd_write_sram_data(
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h03),
+					CLK_MASTER, MWC_WRITE_SRAM_DATA);
+
+	// MWC State machine
+	always @(posedge CLK_MASTER) begin
+		case (MWC_CUR_STATE)
+			MWC_S_IDLE:		begin
+								// S_IDLE: Idle state. Write bit inactive, OE active.
+								SRAM_WE_n_r			<= 1'b1;
+								SRAM_OE_n_r			<= 1'b0;
+								SRA_INCREMENT_MWC	<= 1'b0;
+
+								if ((MWC_WRITE_SRAM_DATA) || (DAM_SRAM_WR)) begin
+									MWC_CUR_STATE	<= MWC_S_OEIA;
+								end else begin
+									MWC_CUR_STATE	<= MWC_S_IDLE;
+								end
+							end
+
+			MWC_S_OEIA:		begin
+								// S_OEIA: Make OE inactive
+								SRAM_OE_n_r			<= 1'b1;
+								MWC_CUR_STATE		<= MWC_S_WRITE;
+							end
+
+			MWC_S_WRITE:	begin
+								// S_WRITE: write to RAM
+								SRAM_WE_n_r			<= 1'b0;
+								SRA_INCREMENT_MWC	<= 1'b0;
+								MWC_CUR_STATE		<= MWC_S_WRITEEND;
+							end
+							
+			MWC_S_WRITEEND:begin
+								SRAM_WE_n_r			<= 1'b1;
+								MWC_CUR_STATE		<= MWC_S_INCADDR;
+							end
+
+			MWC_S_INCADDR:	begin
+								// S_INCADDR: End write and increment Address
+								SRAM_WE_n_r			<= 1'b1;
+								SRA_INCREMENT_MWC	<= 1'b1;
+								MWC_CUR_STATE		<= MWC_S_IDLE;
+							end
+		
+			default:	MWC_CUR_STATE <= MWC_S_IDLE;
+		endcase
+	end
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Memory address counter
+
+	// Synchronise the three WRITE_ADDR signals against the 40MHz clock
+	wire WRITE_SRAM_ADDR_U, WRITE_SRAM_ADDR_H, WRITE_SRAM_ADDR_L;
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_l(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h00),
+					WRITE_SRAM_ADDR_L);
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_h(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h01),
+					WRITE_SRAM_ADDR_H);
+	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_u(
+					CLK_MASTER, (MCU_ADDR[7:0] == 8'h02),
+					WRITE_SRAM_ADDR_U);
+
+	// Sync the READ_DATA signal as well
+	wire READ_SRAM_DATA_REG_SYNC;
+	Flag_CrossDomain _fcd_read_sram_data_reg(
+					MCU_PMRD, (MCU_ADDR[7:0] == 8'h03),
+					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
+
+	// SRAM address should increment after an SRAM read or write operation.
+	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
+
+	AddressCounter addr_count(
+		CLK_MASTER,				// Master clock
+		SRAM_A,					// SRAM address output
+		SRA_INCREMENT,			// Increment input
+		SR_R_EMPTY,				// Empty flag (status register read)
+		SR_R_FULL,				// Full flag (status register read)
+		1'b0, //SR_W_RESET,	// Reset (status register write)
+		SYNC_WRITE_REG,		// Get data from sync-write
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h02),	// Write upper address bits
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h01),	// Write high  address bits
+		MCU_PMWR && (MCU_ADDR[7:0] == 8'h00)	// Write low   address bits
+	);
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -300,111 +395,7 @@ module top(
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
-
-/////////////////////////////////////////////////////////////////////////////
-// Memory write controller
-
-	// SRAM write/output enable
-	reg SRAM_WE_n_r, SRAM_OE_n_r;
-	assign SRAM_WE_n = SRAM_WE_n_r;
-	assign SRAM_OE_n = SRAM_OE_n_r;
 	
-	// SRAM address increment
-	reg SRA_INCREMENT_MWC;
-
-	// Current MWC state
-	reg [1:0] MWC_CUR_STATE;
-	
-	// Valid MWC states
-	parameter MWC_S_IDLE			= 2'h0;		// Idle (waiting for write)
-	parameter MWC_S_OEIA			= 2'h1;		// OE Inactive (disable SRAM outputs)
-	parameter MWC_S_WRITE		= 2'h2;		// Writing to RAM
-	parameter MWC_S_INCADDR		= 2'h3;		// End write and increment address
-
-	// Synchronise input bits from other clock domains
-	wire MWC_WRITE_SRAM_DATA;
-	Flag_CrossDomain _fcd_write_sram_data(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h03),
-					CLK_MASTER, MWC_WRITE_SRAM_DATA);
-
-	// MWC State machine
-	always @(posedge CLK_MASTER) begin
-		case (MWC_CUR_STATE)
-			MWC_S_IDLE:		begin
-								// S_IDLE: Idle state. Write bit inactive, OE active.
-								SRAM_WE_n_r			<= 1'b1;
-								SRAM_OE_n_r			<= 1'b0;
-								SRA_INCREMENT_MWC	<= 1'b0;
-
-								if ((MWC_WRITE_SRAM_DATA) || (DAM_SRAM_WR)) begin
-									MWC_CUR_STATE	<= MWC_S_OEIA;
-								end else begin
-									MWC_CUR_STATE	<= MWC_S_IDLE;
-								end
-							end
-
-			MWC_S_OEIA:		begin
-								// S_OEIA: Make OE inactive
-								SRAM_OE_n_r			<= 1'b1;
-								MWC_CUR_STATE		<= MWC_S_WRITE;
-							end
-
-			MWC_S_WRITE:	begin
-								// S_WRITE: write to RAM
-								SRAM_WE_n_r			<= 1'b0;
-								SRA_INCREMENT_MWC	<= 1'b0;
-								MWC_CUR_STATE		<= MWC_S_INCADDR;
-							end
-
-			MWC_S_INCADDR:	begin
-								// S_INCADDR: End write and increment Address
-								SRAM_WE_n_r			<= 1'b1;
-								SRA_INCREMENT_MWC	<= 1'b1;
-								MWC_CUR_STATE		<= MWC_S_IDLE;
-							end
-		
-			default:	MWC_CUR_STATE <= MWC_S_IDLE;
-		endcase
-	end
-
-
-/////////////////////////////////////////////////////////////////////////////
-// Memory address counter
-
-	// Synchronise the three WRITE_ADDR signals against the 40MHz clock
-	wire WRITE_SRAM_ADDR_U, WRITE_SRAM_ADDR_H, WRITE_SRAM_ADDR_L;
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_l(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h00),
-					WRITE_SRAM_ADDR_L);
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_h(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h01),
-					WRITE_SRAM_ADDR_H);
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_u(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h02),
-					WRITE_SRAM_ADDR_U);
-
-	// Sync the READ_DATA signal as well
-	wire READ_SRAM_DATA_REG_SYNC;
-	Flag_CrossDomain _fcd_read_sram_data_reg(
-					MCU_PMRD, (MCU_ADDR[7:0] == 8'h03),
-					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
-
-	// SRAM address should increment after an SRAM read or write operation.
-	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
-
-	AddressCounter addr_count(
-		CLK_MASTER,					// Master clock
-		SRAM_A,					// SRAM address output
-		SRA_INCREMENT,			// Increment input
-		SR_R_EMPTY,				// Empty flag (status register read)
-		SR_R_FULL,				// Full flag (status register read)
-		1'b0, //SR_W_RESET,	// Reset (status register write)
-		SYNC_WRITE_REG,		// Get data from sync-write
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h02),	// Write upper address bits
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h01),	// Write high  address bits
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h00)		// Write low   address bits
-	);
-
 
 /////////////////////////////////////////////////////////////////////////////
 // Disc drive interface
