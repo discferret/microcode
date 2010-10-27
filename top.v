@@ -75,11 +75,11 @@ module top(
 	
 /////////////////////////////////////////////////////////////////////////////
 // Clock generation
-	// Instantiate a PLL to convert from 40MHz to 32MHz
+	// Instantiate a PLL to convert from 20MHz to 32MHz and 40MHz
 	wire CLK_PLL32MHZ, CLK_MASTER;
 	ClockGenerator clkgen(
-		.inclk0	(CLOCK),
-		.c0		(CLK_PLL32MHZ),				// 32MHz PLL clock
+		.inclk0	(CLOCK),							// 20MHz input clock from the XTAL OSC
+		.c0		(CLK_PLL32MHZ),				// 32MHz DPLL clock (sync detector)
 		.c1		(CLK_MASTER)					// Master clock (40MHz as standard)
 		);
 
@@ -92,6 +92,7 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Status LED
+/*
 	reg [31:0] status_led_counter;
 	reg status_led_r;
 	assign STATUS_LED = status_led_r;
@@ -104,6 +105,9 @@ module top(
 			status_led_counter <= status_led_counter + 1;
 		end
 	end
+*/
+	// Status LED should be on if we're acquiring, or waiting for a trigger event
+	assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING);
 
 	
 /////////////////////////////////////////////////////////////////////////////
