@@ -247,7 +247,7 @@ module top(
 	reg	[7:0]		STEP_RATE;				// step rate in units of 500us
 	reg	[7:0]		DRIVE_CONTROL;			// Disc drive control register
 
-	reg	[1:0]		ACQCON_MFM_CLKSEL;	// MFM decoder clock select
+	reg	[1:0]		MFM_CLKSEL;				// MFM decoder clock select (for syncword detectors)
 
 	reg	[7:0]		ACQ_START_MASK;		// Acquisition start mode
 	reg	[7:0]		ACQ_STOP_MASK;			// Acquisition stop mode
@@ -314,8 +314,6 @@ module top(
 						// ACQCON
 						//    bit 0 = START  \__ handled elsewhere
 						//    bit 1 = ABORT  /
-						// Bits 7,6: MFM clock select bits
-						ACQCON_MFM_CLKSEL <= MCU_PMD[7:6];
 					 end
 
 			8'h06: begin			// ACQ_START_EVT
@@ -369,6 +367,11 @@ module top(
 			8'h11: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
 						SYNC_WRITE_REG <= MCU_PMD;
+					 end
+
+			8'h12: begin			// MFM_CLKSEL -- MFM Clock Select
+						// Bits 1,0: MFM clock select bits
+						MFM_CLKSEL <= MCU_PMD[1:0];
 					 end
 
 			default: begin
@@ -485,7 +488,7 @@ module top(
 		.CLK_32MHZ				(CLK_PLL32MHZ),
 		.CLK_MASTER				(CLK_MASTER),
 		.CLK_250US				(STEP_GEN_MASTER_CLK),
-		.DATASEP_CLKSEL		(ACQCON_MFM_CLKSEL),
+		.DATASEP_CLKSEL		(MFM_CLKSEL),
 		.START					(ACQCON_START_sync),
 		.ABORT					(ACQCON_ABORT_sync),
 		.FD_INDEX_IN			(FD_INDEX_IN),
