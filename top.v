@@ -259,6 +259,8 @@ module top(
 	
 	reg	[15:0]	MFM_SYNCWORD_START;	// MFM sync word, start event
 	reg	[15:0]	MFM_SYNCWORD_STOP;	// MFM sync word, stop  event
+	reg	[15:0]	MFM_MASK_START;		// MFM mask word, start event
+	reg	[15:0]	MFM_MASK_STOP;			// MFM mask word, stop  event
 
 // Nets for status register bits
 	wire SR_R_EMPTY, SR_R_FULL;			// Empty/full flags from address counter
@@ -334,44 +336,60 @@ module top(
 						ACQ_STOP_NUM <= MCU_PMD;
 					 end
 
-			8'h0A: begin			// ACQ_HSTMD_THR_START
+			8'h10: begin			// ACQ_HSTMD_THR_START
 						// Load HSTMD start threshold
 						HSTMD_THRESH_START <= MCU_PMD;
 					 end
 
- 			8'h0B: begin			// ACQ_HSTMD_THR_STOP
+ 			8'h11: begin			// ACQ_HSTMD_THR_STOP
 						// Load HSTMD stop threshold
 						HSTMD_THRESH_STOP <= MCU_PMD;
 					 end
 
-			8'h0C: begin			// MFM_SYNCWORD_START_L
+			8'h20: begin			// MFM_SYNCWORD_START_L
 						MFM_SYNCWORD_START[7:0] <= MCU_PMD;
 					 end
 
- 			8'h0D: begin			// MFM_SYNCWORD_START_H
+ 			8'h21: begin			// MFM_SYNCWORD_START_H
 						MFM_SYNCWORD_START[15:8] <= MCU_PMD;
 					 end
 
-			8'h0E: begin			// MFM_SYNCWORD_STOP_L
+			8'h22: begin			// MFM_SYNCWORD_STOP_L
 						MFM_SYNCWORD_STOP[7:0] <= MCU_PMD;
 					 end
 
-			8'h0F: begin			// MFM_SYNCWORD_STOP_H
+			8'h23: begin			// MFM_SYNCWORD_STOP_H
 						MFM_SYNCWORD_STOP[15:8] <= MCU_PMD;
 					 end
 
-			8'h10: begin			// STEP_RATE -- Disc drive step rate
+			8'h24: begin			// MFM_MASK_START_L
+						MFM_MASK_START[7:0] <= MCU_PMD;
+					 end
+
+ 			8'h25: begin			// MFM_MASK_START_H
+						MFM_MASK_START[15:8] <= MCU_PMD;
+					 end
+
+			8'h26: begin			// MFM_MASK_STOP_L
+						MFM_MASK_STOP[7:0] <= MCU_PMD;
+					 end
+
+			8'h27: begin			// MFM_MASK_STOP_H
+						MFM_MASK_STOP[15:8] <= MCU_PMD;
+					 end
+
+ 			8'h2F: begin			// MFM_CLKSEL -- MFM Clock Select
+						// Bits 1,0: MFM clock select bits
+						MFM_CLKSEL <= MCU_PMD[1:0];
+					 end
+
+			8'hF0: begin			// STEP_RATE -- Disc drive step rate
 						STEP_RATE <= MCU_PMD;
 					 end
 
-			8'h11: begin			// STEP_CMD  -- Disc drive step command
+			8'hFF: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
 						SYNC_WRITE_REG <= MCU_PMD;
-					 end
-
-			8'h12: begin			// MFM_CLKSEL -- MFM Clock Select
-						// Bits 1,0: MFM clock select bits
-						MFM_CLKSEL <= MCU_PMD[1:0];
 					 end
 
 			default: begin
@@ -390,19 +408,7 @@ module top(
 			8'h05:	MCU_PMD_OUT = MCO_TYPE[15:8];					// Microcode type high
 			8'h06:	MCU_PMD_OUT = MCO_VERSION[7:0];				// Microcode version low
 			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
-/*			8'h08:	begin
-						end
-			8'h09:	begin
-						end
-			8'h0A:	begin
-						end
-			8'h0B:	begin
-						end
-			8'h0C:	begin
-						end
-			8'h0D:	begin
-						end
-*/			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
+			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
 							{6'b0, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
@@ -456,7 +462,7 @@ module top(
 // Stepping controller
 	wire WRITE_STEP_REG;
 	Flag_CrossDomain _fcd_write_step_reg(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h11),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'hFF),
 					CLK_MASTER, WRITE_STEP_REG);
 	StepController stepper(
 		CLK_MASTER,
@@ -502,6 +508,8 @@ module top(
 		.HSTMD_THRESH_STOP	(HSTMD_THRESH_STOP),
 		.MFM_SYNCWORD_START	(MFM_SYNCWORD_START),
 		.MFM_SYNCWORD_STOP	(MFM_SYNCWORD_STOP),
+		.MFM_MASK_START		(MFM_MASK_START),
+		.MFM_MASK_STOP			(MFM_MASK_STOP),
 		.WAITING					(ACQSTAT_WAITING),
 		.ACQUIRING				(ACQSTAT_ACQUIRING),
 		.debug					()

@@ -15,6 +15,8 @@ module AcquisitionControl(
 	HSTMD_THRESH_STOP,
 	MFM_SYNCWORD_START,
 	MFM_SYNCWORD_STOP,
+	MFM_MASK_START,
+	MFM_MASK_STOP,
 	WAITING, ACQUIRING,
 	debug
 );
@@ -35,6 +37,8 @@ module AcquisitionControl(
 	input		[7:0]		HSTMD_THRESH_STOP;		// Threshold for Stop Event HSTMD
 	input		[15:0]	MFM_SYNCWORD_START;		// MFM Syncword for starting acq
 	input		[15:0]	MFM_SYNCWORD_STOP;		// MFM Syncword for stopping acq
+	input		[15:0]	MFM_MASK_START;			// MFM Syncword mask for starting acq
+	input		[15:0]	MFM_MASK_STOP;				// MFM Syncword mask for stopping acq
 
 	output				WAITING;						// Status o/p: waiting for trigger
 	output				ACQUIRING;					// Status o/p: acquiring
@@ -94,7 +98,8 @@ module AcquisitionControl(
 		.CLK_PLL32MHZ			(CLK_32MHZ),
 		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
-		.SYNC_WORD_IN			(16'h4489), //(MFM_SYNCWORD_START),
+		.SYNC_WORD_IN			(MFM_SYNCWORD_START),
+		.MASK_IN					(MFM_MASK_START),
 		.SYNC_WORD_DETECTED	(SYNCWD_START_EVT_DETECTED)
 	);
 
@@ -102,7 +107,8 @@ module AcquisitionControl(
 		.CLK_PLL32MHZ			(CLK_32MHZ),
 		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
-		.SYNC_WORD_IN			(16'h4489), //(MFM_SYNCWORD_STOP),
+		.SYNC_WORD_IN			(MFM_SYNCWORD_STOP),
+		.MASK_IN					(MFM_MASK_STOP),
 		.SYNC_WORD_DETECTED	(SYNCWD_STOP_EVT_DETECTED)
 	);
 

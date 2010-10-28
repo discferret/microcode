@@ -3,6 +3,7 @@ module MFMSyncWordDetector(
 	DATASEP_MASTER_CLK,
 	FD_RDDATA_IN,
 	SYNC_WORD_IN,
+	MASK_IN,
 	SYNC_WORD_DETECTED
 );
 
@@ -10,6 +11,7 @@ module MFMSyncWordDetector(
 	input					DATASEP_MASTER_CLK;		// Data separator master clock
 	input					FD_RDDATA_IN;				// Floppy disc read-data in
 	input		[15:0]	SYNC_WORD_IN;				// Syncword to look for
+	input		[15:0]	MASK_IN;						// Syncword mask
 	output				SYNC_WORD_DETECTED;		// 1 if sync word detected
 
 
@@ -46,10 +48,9 @@ module MFMSyncWordDetector(
 	end
 
 	reg SYNC_WORD_DETECTED;
-	always @(posedge DATASEP_MASTER_CLK) SYNC_WORD_DETECTED <= (sync_shift_r == SYNC_WORD_IN);
+	always @(posedge DATASEP_MASTER_CLK)
+		SYNC_WORD_DETECTED <= ((sync_shift_r & MASK_IN) == SYNC_WORD_IN);
 
-//	assign SYNC_WORD_DETECTED = (sync_shift_r == SYNC_WORD_IN);
-	
 endmodule
 
 // vim: ts=3 sw=3
