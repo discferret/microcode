@@ -22,17 +22,18 @@ module MFMSyncWordDetector(
 	
 	// Detect transitions on DWIN
 	reg [1:0] dwin_transition_detector;
-	wire dwin_transition;
-	always @(posedge CLK_PLL32MHZ) dwin_transition_detector <= {dwin_transition_detector[0], DWIN};
-//	always @(posedge DATASEP_MASTER_CLK) dwin_transition_detector <= {dwin_transition_detector[0], DWIN};
-	assign dwin_transition = (dwin_transition_detector[0] ^ dwin_transition_detector[1]);
-
+	reg dwin_transition_r;
+	always @(posedge CLK_PLL32MHZ) begin
+		dwin_transition_detector <= {dwin_transition_detector[0], DWIN};
+		dwin_transition_r <= (dwin_transition_detector[0] ^ dwin_transition_detector[1]);
+	end
+		
 	// MFM sync shift register
 	reg [15:0] sync_shift_r;
 
 	// Detect if a transition occurred inside the data window
 	reg flux_detected;
-	always @(negedge SHAPED_DATA or posedge dwin_transition) begin
+	always @(negedge SHAPED_DATA or posedge dwin_transition_r) begin
 		if (!SHAPED_DATA) begin
 			// Data pulse. Set the transition bit.
 			flux_detected <= 1'b1;
