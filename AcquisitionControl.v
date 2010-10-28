@@ -28,9 +28,9 @@ module AcquisitionControl(
 	input					FD_RDDATA_IN;				// DATA READ from FDD, +ve active
 	input					SR_R_FULL;					// RAM full (1=true)
 	input		[2:0]		ACQ_START_MASK;			// Starting event mask
-	input		[4:0]		ACQ_START_NUM;				// Number of start events req'd
+	input		[7:0]		ACQ_START_NUM;				// Number of start events req'd
 	input		[2:0]		ACQ_STOP_MASK;				// Stopping event mask
-	input		[4:0]		ACQ_STOP_NUM;				// Number of stop events req'd
+	input		[7:0]		ACQ_STOP_NUM;				// Number of stop events req'd
 	input		[7:0]		HSTMD_THRESH_START;		// Threshold for Start Event HSTMD
 	input		[7:0]		HSTMD_THRESH_STOP;		// Threshold for Stop Event HSTMD
 	input		[15:0]	MFM_SYNCWORD_START;		// MFM Syncword for starting acq
@@ -162,7 +162,7 @@ assign debug={
 	parameter SSFSM_S_ACQ		= 3'b100;
 	
 	reg [2:0] SSFSM_CUR_STATE;
-	reg [4:0] SCOUNT, ECOUNT;
+	reg [7:0] SCOUNT, ECOUNT;
 	
 	always @(posedge CLK_MASTER) begin
 		// Abort logic -- if ABORT goes high, reset the FSM

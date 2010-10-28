@@ -250,9 +250,9 @@ module top(
 	reg	[1:0]		ACQCON_MFM_CLKSEL;	// MFM decoder clock select
 
 	reg	[2:0]		ACQ_START_MASK;		// Acquisition start mode
-	reg	[4:0]		ACQ_START_NUM;			// Number of start events before acq starts
 	reg	[2:0]		ACQ_STOP_MASK;			// Acquisition stop mode
-	reg	[4:0]		ACQ_STOP_NUM;			// Number of stop events before acq ends
+	reg	[7:0]		ACQ_START_NUM;			// Number of start events before acq starts
+	reg	[7:0]		ACQ_STOP_NUM;			// Number of stop events before acq ends
 	
 	reg	[7:0]		HSTMD_THRESH_START;	// HSTMD threshold, start event
 	reg	[7:0]		HSTMD_THRESH_STOP;	// HSTMD threshold, stop  event
@@ -320,45 +320,53 @@ module top(
 
 			8'h06: begin			// ACQ_START_EVT
 						// Load the acq start counter and mask
-						{ACQ_START_MASK, ACQ_START_NUM} <= MCU_PMD;
+						ACQ_START_MASK <= MCU_PMD;
 					 end
 
 			8'h07: begin			// ACQ_STOP_EVT
 						// Load the acq stop counter and mask
-						{ACQ_STOP_MASK, ACQ_STOP_NUM} <= MCU_PMD;
+						ACQ_STOP_MASK <= MCU_PMD;
 					 end
 
-			8'h08: begin			// ACQ_HSTMD_THR_START
+			8'h08: begin			// ACQ_START_NUM
+						ACQ_START_NUM <= MCU_PMD;
+					 end
+
+			8'h09: begin			// ACQ_STOP_NUM
+						ACQ_STOP_NUM <= MCU_PMD;
+					 end
+
+			8'h0A: begin			// ACQ_HSTMD_THR_START
 						// Load HSTMD start threshold
 						HSTMD_THRESH_START <= MCU_PMD;
 					 end
 
- 			8'h09: begin			// ACQ_HSTMD_THR_STOP
+ 			8'h0B: begin			// ACQ_HSTMD_THR_STOP
 						// Load HSTMD stop threshold
 						HSTMD_THRESH_STOP <= MCU_PMD;
 					 end
 
-			8'h0A: begin			// MFM_SYNCWORD_START_L
+			8'h0C: begin			// MFM_SYNCWORD_START_L
 						MFM_SYNCWORD_START[7:0] <= MCU_PMD;
 					 end
 
- 			8'h0B: begin			// MFM_SYNCWORD_START_H
+ 			8'h0D: begin			// MFM_SYNCWORD_START_H
 						MFM_SYNCWORD_START[15:8] <= MCU_PMD;
 					 end
 
-			8'h0C: begin			// MFM_SYNCWORD_STOP_L
+			8'h0E: begin			// MFM_SYNCWORD_STOP_L
 						MFM_SYNCWORD_STOP[7:0] <= MCU_PMD;
 					 end
 
-			8'h0D: begin			// MFM_SYNCWORD_STOP_H
+			8'h0F: begin			// MFM_SYNCWORD_STOP_H
 						MFM_SYNCWORD_STOP[15:8] <= MCU_PMD;
 					 end
 
-			8'h0E: begin			// STEP_RATE -- Disc drive step rate
+			8'h10: begin			// STEP_RATE -- Disc drive step rate
 						STEP_RATE <= MCU_PMD;
 					 end
 
-			8'h0F: begin			// STEP_CMD  -- Disc drive step command
+			8'h11: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
 						SYNC_WRITE_REG <= MCU_PMD;
 					 end
