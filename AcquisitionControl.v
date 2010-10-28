@@ -197,7 +197,7 @@ assign debug={
 								if (ACQ_STARTEVT_MATCH_sync || (ACQ_START_MASK[1:0] == 2'b00)) begin
 									if (SCOUNT > 0) begin
 										// counter nonzero, decrement and keep waiting
-										SCOUNT <= SCOUNT - 5'd1;
+										SCOUNT <= SCOUNT - 8'd1;
 										SSFSM_CUR_STATE <= SSFSM_S_WAIT;
 									end else begin
 										// counter reached zero, start acquiring
@@ -225,7 +225,7 @@ assign debug={
 								if (ACQ_STOPEVT_MATCH_sync || (ACQ_STOP_MASK == 3'b0)) begin
 									if (ECOUNT > 0) begin
 										// end counter nonzero, keep acquiring
-										ECOUNT <= ECOUNT - 5'd1;
+										ECOUNT <= ECOUNT - 8'd1;
 										SSFSM_CUR_STATE <= SSFSM_S_ACQ;
 									end else begin
 										// counter=0, we're done. end the acq cycle and go home.

@@ -453,7 +453,7 @@ module top(
 // Stepping controller
 	wire WRITE_STEP_REG;
 	Flag_CrossDomain _fcd_write_step_reg(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h0F),
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h11),
 					CLK_MASTER, WRITE_STEP_REG);
 	StepController stepper(
 		CLK_MASTER,
