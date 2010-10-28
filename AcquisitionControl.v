@@ -27,9 +27,9 @@ module AcquisitionControl(
 	input					FD_INDEX_IN;				// INDEX pulse, +ve active
 	input					FD_RDDATA_IN;				// DATA READ from FDD, +ve active
 	input					SR_R_FULL;					// RAM full (1=true)
-	input		[2:0]		ACQ_START_MASK;			// Starting event mask
+	input		[7:0]		ACQ_START_MASK;			// Starting event mask
 	input		[7:0]		ACQ_START_NUM;				// Number of start events req'd
-	input		[2:0]		ACQ_STOP_MASK;				// Stopping event mask
+	input		[7:0]		ACQ_STOP_MASK;				// Stopping event mask
 	input		[7:0]		ACQ_STOP_NUM;				// Number of stop events req'd
 	input		[7:0]		HSTMD_THRESH_START;		// Threshold for Start Event HSTMD
 	input		[7:0]		HSTMD_THRESH_STOP;		// Threshold for Stop Event HSTMD
@@ -155,11 +155,11 @@ assign debug={
 	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STOPEVT_SYNC(CLK_MASTER, ACQ_STOPEVT_MATCH, ACQ_STOPEVT_MATCH_sync);
 
 	// event detection state machine
-	parameter SSFSM_S_IDLE		= 3'b000;
-	parameter SSFSM_S_HSTMD		= 3'b001;
-	parameter SSFSM_S_WAIT		= 3'b010;
+	parameter SSFSM_S_IDLE			= 3'b000;
+	parameter SSFSM_S_HSTMD			= 3'b001;
+	parameter SSFSM_S_WAIT			= 3'b010;
 	parameter SSFSM_S_WAITHSACQ	= 3'b011;
-	parameter SSFSM_S_ACQ		= 3'b100;
+	parameter SSFSM_S_ACQ			= 3'b100;
 	
 	reg [2:0] SSFSM_CUR_STATE;
 	reg [7:0] SCOUNT, ECOUNT;
@@ -174,7 +174,7 @@ assign debug={
 								if (START) begin
 									SCOUNT <= ACQ_START_NUM;
 									ECOUNT <= ACQ_STOP_NUM;
-									if (ACQ_START_MASK[2] == 1'b1) begin
+									if (ACQ_START_MASK[7] == 1'b1) begin
 										// HSTMD-then-ACQ enabled, wait for HSTMD
 										SSFSM_CUR_STATE <= SSFSM_S_HSTMD;
 									end else begin
@@ -201,7 +201,7 @@ assign debug={
 										SSFSM_CUR_STATE <= SSFSM_S_WAIT;
 									end else begin
 										// counter reached zero, start acquiring
-										if (ACQ_STOP_MASK[2]) begin
+										if (ACQ_STOP_MASK[7]) begin
 											// need to wait for TMD
 											SSFSM_CUR_STATE <= SSFSM_S_WAITHSACQ;
 										end else begin

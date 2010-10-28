@@ -249,8 +249,8 @@ module top(
 
 	reg	[1:0]		ACQCON_MFM_CLKSEL;	// MFM decoder clock select
 
-	reg	[2:0]		ACQ_START_MASK;		// Acquisition start mode
-	reg	[2:0]		ACQ_STOP_MASK;			// Acquisition stop mode
+	reg	[7:0]		ACQ_START_MASK;		// Acquisition start mode
+	reg	[7:0]		ACQ_STOP_MASK;			// Acquisition stop mode
 	reg	[7:0]		ACQ_START_NUM;			// Number of start events before acq starts
 	reg	[7:0]		ACQ_STOP_NUM;			// Number of stop events before acq ends
 	
