@@ -103,17 +103,6 @@ set_global_assignment -name CYCLONEII_RESERVE_NCEO_AFTER_CONFIGURATION "USE AS R
 set_location_assignment PIN_100 -to STATUS_LED
 set_global_assignment -name GENERATE_RBF_FILE ON
 set_global_assignment -name DEVICE_MIGRATION_LIST "EP2C8T144C8,EP2C5T144C8"
-set_global_assignment -name VERILOG_FILE Flag_CrossDomain.v
-set_global_assignment -name VERILOG_FILE DataSeparator.v
-set_global_assignment -name VERILOG_FILE TrackMarkDetector.v
-set_global_assignment -name VERILOG_FILE Flag_Delay1tcy_OneCycle.v
-set_global_assignment -name VERILOG_FILE Signal_CrossDomain_As_Flag.v
-set_global_assignment -name VERILOG_FILE AcquisitionControl.v
-set_global_assignment -name VERILOG_FILE DiscReader.v
-set_global_assignment -name VERILOG_FILE AddressCounter.v
-set_global_assignment -name VERILOG_FILE top.v
-set_global_assignment -name VERILOG_FILE MFMSyncWordDetector.v
-set_global_assignment -name VERILOG_FILE StepController.v
 set_location_assignment PIN_114 -to FD_DENS_OUT
 set_location_assignment PIN_71 -to MCU_PMALH
 set_location_assignment PIN_72 -to MCU_PMALL
@@ -136,5 +125,17 @@ set_location_assignment PIN_73 -to HSIO_PORT[3]
 set_location_assignment PIN_74 -to HSIO_PORT[2]
 set_location_assignment PIN_75 -to HSIO_PORT[1]
 set_location_assignment PIN_76 -to HSIO_PORT[0]
+set_global_assignment -name VERILOG_FILE Flag_CrossDomain.v
+set_global_assignment -name VERILOG_FILE DataSeparator.v
+set_global_assignment -name VERILOG_FILE TrackMarkDetector.v
+set_global_assignment -name VERILOG_FILE Flag_Delay1tcy_OneCycle.v
+set_global_assignment -name VERILOG_FILE Signal_CrossDomain_As_Flag.v
+set_global_assignment -name VERILOG_FILE AcquisitionControl.v
+set_global_assignment -name VERILOG_FILE DiscReader.v
+set_global_assignment -name VERILOG_FILE AddressCounter.v
+set_global_assignment -name VERILOG_FILE top.v
+set_global_assignment -name VERILOG_FILE MFMSyncWordDetector.v
+set_global_assignment -name VERILOG_FILE StepController.v
 set_global_assignment -name QIP_FILE ClockGenerator.qip
+set_global_assignment -name VERILOG_FILE DiscWriter.v
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

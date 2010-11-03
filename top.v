@@ -65,8 +65,8 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Unused I/O pins
-	assign	FD_WRDATA	= 1'b1;
-	assign	FD_WRGATE	= 1'b1;
+//	assign	FD_WRDATA	= 1'b1;
+//	assign	FD_WRGATE	= 1'b1;
 	assign	HSIO_PORT	= 4'hZ;
 
 	// SRAM -- chip select, etc.
@@ -107,7 +107,7 @@ module top(
 	end
 */
 	// Status LED should be on if we're acquiring, or waiting for a trigger event
-	assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING);
+	assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING);
 
 	
 /////////////////////////////////////////////////////////////////////////////
@@ -226,7 +226,8 @@ module top(
 					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
 
 	// SRAM address should increment after an SRAM read or write operation.
-	wire SRA_INCREMENT = (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
+	wire SRA_INCREMENT_DWC;
+	wire SRA_INCREMENT = (SRA_INCREMENT_DWC) || (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
 
 	AddressCounter addr_count(
 		CLK_MASTER,				// Master clock
@@ -256,6 +257,7 @@ module top(
 	
 	reg	[7:0]		HSTMD_THRESH_START;	// HSTMD threshold, start event
 	reg	[7:0]		HSTMD_THRESH_STOP;	// HSTMD threshold, stop  event
+	reg	[7:0]		HSTMD_THRESH_WRITE;	// HSTMD threshold, write controller
 	
 	reg	[15:0]	MFM_SYNCWORD_START;	// MFM sync word, start event
 	reg	[15:0]	MFM_SYNCWORD_STOP;	// MFM sync word, stop  event
@@ -271,6 +273,7 @@ module top(
 	
 	wire ACQSTAT_WAITING;					// Acquisition engine waiting for event
 	wire ACQSTAT_ACQUIRING;					// Acquisition engine acquiring data
+	wire ACQSTAT_WRITING;					// Write engine is writing data
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -314,8 +317,9 @@ module top(
 
 			8'h05: begin
 						// ACQCON
-						//    bit 0 = START  \__ handled elsewhere
-						//    bit 1 = ABORT  /
+						//    bit 0 = START  }
+						//    bit 1 = ABORT   }--- handled elsewhere
+						//		bit 2 = WRITE  }
 					 end
 
 			8'h06: begin			// ACQ_START_EVT
@@ -336,14 +340,19 @@ module top(
 						ACQ_STOP_NUM <= MCU_PMD;
 					 end
 
-			8'h10: begin			// ACQ_HSTMD_THR_START
+			8'h10: begin			// HSTMD_THR_START
 						// Load HSTMD start threshold
 						HSTMD_THRESH_START <= MCU_PMD;
 					 end
 
- 			8'h11: begin			// ACQ_HSTMD_THR_STOP
+ 			8'h11: begin			// HSTMD_THR_STOP
 						// Load HSTMD stop threshold
 						HSTMD_THRESH_STOP <= MCU_PMD;
+					 end
+
+			8'h12: begin			// HSTMD_THR_WRITE
+						// Load HSTMD threshold for the write controller
+						HSTMD_THRESH_WRITE <= MCU_PMD;
 					 end
 
 			8'h20: begin			// MFM_SYNCWORD_START_L
@@ -409,7 +418,7 @@ module top(
 			8'h06:	MCU_PMD_OUT = MCO_VERSION[7:0];				// Microcode version low
 			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
 			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
-							{6'b0, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
+							{5'b0, ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
 							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
@@ -481,13 +490,16 @@ module top(
 // Acquisition
 
 	// Clock-synchronised Start and Abort signals -- derived from writes to ACQCON
-	wire ACQCON_START_sync, ACQCON_ABORT_sync;
+	wire ACQCON_START_sync, ACQCON_ABORT_sync, ACQCON_WRITE_sync;
 	Flag_CrossDomain _fcd_write_acqcon_start(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h05) && (MCU_PMD[0] == 1'b1),
 					CLK_MASTER, ACQCON_START_sync);
 	Flag_CrossDomain _fcd_write_acqcon_abort(
 					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h05) && (MCU_PMD[1] == 1'b1),
 					CLK_MASTER, ACQCON_ABORT_sync);
+	Flag_CrossDomain _fcd_write_acqcon_write(
+					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h05) && (MCU_PMD[2] == 1'b1),
+					CLK_MASTER, ACQCON_WRITE_sync);
 
 	// Acquisition control unit
 	AcquisitionControl _acqcontrol(
@@ -524,6 +536,32 @@ module top(
 		.RESET					(ACQCON_ABORT_sync),
 		.DATA						(DAM_SRAM_WRITE_BUS),
 		.WRITE					(DAM_SRAM_WR)
+	);
+
+	// Disc Writer track mark detector
+	reg CLK_500US;
+	always @(posedge STEP_GEN_MASTER_CLK) CLK_500US <= ~CLK_500US;
+	wire TMD_DISCWRITER;
+	TrackMarkDetector _trackmarkdetector_discwriter(
+		.clock					(CLK_500US),
+		.reset					(ACQCON_ABORT_sync),
+		.index					(FD_INDEX_IN),
+		.threshold				(HSTMD_THRESH_WRITE),
+		.detect					(TMD_DISCWRITER)
+	);
+
+	// Disc Writer Module
+	DiscWriter _discwriter(
+		.reset					(ACQCON_ABORT_sync),
+		.clock					(CLK_MASTER),
+		.mdat						(SRAM_DQ),
+		.maddr_inc				(SRA_INCREMENT_DWC),
+		.wrdata					(FD_WRDATA),
+		.wrgate					(FD_WRGATE),
+		.trkmark					(TMD_DISCWRITER),
+		.index					(FD_INDEX_IN),
+		.start					(ACQCON_WRITE_sync),
+		.running					(ACQSTAT_WRITING)
 	);
 
 endmodule
