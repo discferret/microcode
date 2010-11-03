@@ -49,7 +49,7 @@ module MFMSyncWordDetector(
 
 	reg SYNC_WORD_DETECTED;
 	always @(posedge DATASEP_MASTER_CLK)
-		SYNC_WORD_DETECTED <= ((sync_shift_r & MASK_IN) == SYNC_WORD_IN);
+		SYNC_WORD_DETECTED <= ((sync_shift_r & MASK_IN) == (SYNC_WORD_IN & MASK_IN));
 
 endmodule
 
