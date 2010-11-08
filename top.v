@@ -307,7 +307,7 @@ module top(
 // Handle host interface reads and writes
 	always @(posedge CLK_MASTER) begin
 		// Latch SRAM data when PMRD goes high
-		if (MCU_PMRD_sync && (MCU_ADDR[7:0] == 8'h03)) begin
+		if (!MCU_PMRD_sync && (MCU_ADDR[7:0] == 8'h03)) begin
 			SRAM_DQ_LAT <= SRAM_DQ;
 		end
 	
