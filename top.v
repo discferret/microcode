@@ -264,6 +264,8 @@ module top(
 	reg	[15:0]	MFM_MASK_START;		// MFM mask word, start event
 	reg	[15:0]	MFM_MASK_STOP;			// MFM mask word, stop  event
 
+	reg	[7:0]		SCRATCHPAD;				// 8-bit scratchpad register (used by ATE for bus interface testing)
+
 // Nets for status register bits
 	wire SR_R_EMPTY, SR_R_FULL;			// Empty/full flags from address counter
 	wire SR_FDS_STEPPING;					// =1 if stepping controller is stepping
@@ -392,6 +394,10 @@ module top(
 						MFM_CLKSEL <= MCU_PMD[1:0];
 					 end
 
+			8'h30: begin			// Scratchpad register for ATE testing
+						SCRATCHPAD <= MCU_PMD[7:0];
+					 end
+
 			8'hF0: begin			// STEP_RATE -- Disc drive step rate
 						STEP_RATE <= MCU_PMD;
 					 end
@@ -422,6 +428,8 @@ module top(
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
 							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
+			8'h30:	MCU_PMD_OUT = SCRATCHPAD;						// Scratchpad register
+			8'h31:	MCU_PMD_OUT = ~SCRATCHPAD;						// Inverse Scratchpad register
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
