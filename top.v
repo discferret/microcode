@@ -152,11 +152,9 @@ module top(
 	parameter MWC_S_INCADDR		= 3'h3;		// End write and increment address
 	parameter MWC_S_WRITEEND	= 3'h4;
 
-	// Synchronise input bits from other clock domains
-	wire MWC_WRITE_SRAM_DATA;
-	Flag_CrossDomain _fcd_write_sram_data(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'h03),
-					CLK_MASTER, MWC_WRITE_SRAM_DATA);
+	// SRAM Write command bit from register address decoder (below)
+	wire MWC_WRITE_SRAM_DATA, MWC_WRITE_SRAM_DATA_pre;
+	Flag_Delay1tcy_OneCycle _fd1oc_ramwr_sync(CLK_MASTER, MCU_PMWR_sync && (MCU_ADDR[7:0] == 8'h03), MWC_WRITE_SRAM_DATA);
 
 	// MWC State machine
 	always @(posedge CLK_MASTER) begin
@@ -175,9 +173,10 @@ module top(
 							end
 
 			MWC_S_OEIA:		begin
-								// S_OEIA: Make OE inactive
+								// S_OEIA: Make OE inactive and load data
 								SRAM_OE_n_r			<= 1'b1;
 								MWC_CUR_STATE		<= MWC_S_WRITE;
+								SRAM_DATA_OUT[7:0] <= MCU_PMD;
 							end
 
 			MWC_S_WRITE:	begin
@@ -207,27 +206,25 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // Memory address counter
 
-	// Synchronise the three WRITE_ADDR signals against the 40MHz clock
-	wire WRITE_SRAM_ADDR_U, WRITE_SRAM_ADDR_H, WRITE_SRAM_ADDR_L;
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_l(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h00),
-					WRITE_SRAM_ADDR_L);
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_h(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h01),
-					WRITE_SRAM_ADDR_H);
-	Flag_Delay1tcy_OneCycle _fcd_write_sram_addr_u(
-					CLK_MASTER, (MCU_ADDR[7:0] == 8'h02),
-					WRITE_SRAM_ADDR_U);
-
-	// Sync the READ_DATA signal as well
-	wire READ_SRAM_DATA_REG_SYNC;
-	Flag_CrossDomain _fcd_read_sram_data_reg(
-					MCU_PMRD, (MCU_ADDR[7:0] == 8'h03),
-					CLK_MASTER, READ_SRAM_DATA_REG_SYNC);
+	// Generate a falling-edge-detect signal for PMRD
+	// Delay increment 
+	wire SRA_INCREMENT_RAMRD_DONE;
+	Flag_Delay1tcy_OneCycle _fd1oc_ramread_done(CLK_MASTER, !((MCU_ADDR[7:0] == 8'h03) && MCU_PMRD_sync), SRA_INCREMENT_RAMRD_DONE);
 
 	// SRAM address should increment after an SRAM read or write operation.
+	// DWC = Disc Write Controller
+	// MWC = Memory Write Controller
+	// RAMRD = RAM Read
 	wire SRA_INCREMENT_DWC;
-	wire SRA_INCREMENT = (SRA_INCREMENT_DWC) || (SRA_INCREMENT_MWC) || (READ_SRAM_DATA_REG_SYNC);
+	wire SRA_INCREMENT = (SRA_INCREMENT_DWC) || (SRA_INCREMENT_MWC) || (SRA_INCREMENT_RAMRD_DONE);
+
+	wire ACO_WRITE_UPPER, ACO_WRITE_HIGH, ACO_WRITE_LOW;
+	Flag_Delay1tcy_OneCycle _fd1oc_aco_wr_u(CLK_MASTER, MCU_PMWR && (MCU_ADDR[7:0] == 8'h02),
+					ACO_WRITE_UPPER);
+	Flag_Delay1tcy_OneCycle _fd1oc_aco_wr_h(CLK_MASTER, MCU_PMWR && (MCU_ADDR[7:0] == 8'h01),
+					ACO_WRITE_HIGH);
+	Flag_Delay1tcy_OneCycle _fd1oc_aco_wr_l(CLK_MASTER, MCU_PMWR && (MCU_ADDR[7:0] == 8'h00),
+					ACO_WRITE_LOW);
 
 	AddressCounter addr_count(
 		CLK_MASTER,				// Master clock
@@ -236,10 +233,10 @@ module top(
 		SR_R_EMPTY,				// Empty flag (status register read)
 		SR_R_FULL,				// Full flag (status register read)
 		1'b0, //SR_W_RESET,	// Reset (status register write)
-		SYNC_WRITE_REG,		// Get data from sync-write
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h02),	// Write upper address bits
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h01),	// Write high  address bits
-		MCU_PMWR && (MCU_ADDR[7:0] == 8'h00)	// Write low   address bits
+		MCU_PMD,					// Data source for load operations
+		ACO_WRITE_UPPER,		// Write upper address bits
+		ACO_WRITE_HIGH,		// Write high  address bits
+		ACO_WRITE_LOW			// Write low   address bits
 	);
 
 
@@ -265,6 +262,8 @@ module top(
 	reg	[15:0]	MFM_MASK_STOP;			// MFM mask word, stop  event
 
 	reg	[7:0]		SCRATCHPAD;				// 8-bit scratchpad register (used by ATE for bus interface testing)
+	
+	reg	[7:0]		SRAM_DQ_LAT;			// Read-data from the SRAM, latched on L->H edge on PMRD
 
 // Nets for status register bits
 	wire SR_R_EMPTY, SR_R_FULL;			// Empty/full flags from address counter
@@ -290,30 +289,42 @@ module top(
 // Latch the address on an Address Write
 	reg [7:0] MCU_ADDRH, MCU_ADDRL;
 	wire [15:0] MCU_ADDR = {MCU_ADDRH, MCU_ADDRL};
-	always @(negedge MCU_PMALH)
+/*	always @(negedge MCU_PMALH)
 		MCU_ADDRH <= MCU_PMD;
 	always @(negedge MCU_PMALL)
 		MCU_ADDRL <= MCU_PMD;
+*/
+	always @(posedge CLK_MASTER) begin
+		if (MCU_PMALH) MCU_ADDRH <= MCU_PMD;
+		if (MCU_PMALL) MCU_ADDRL <= MCU_PMD;
+	end
 
-// Temporary synch register for incoming data from the MCU
-	reg [7:0] SYNC_WRITE_REG;
+// Sync PMWR and PMRD against master clock and limit to one cycle
+	wire MCU_PMRD_sync, MCU_PMWR_sync;
+	Flag_Delay1tcy_OneCycle _fd1oc_pmwr_sync(CLK_MASTER, MCU_PMWR, MCU_PMWR_sync);
+	Flag_Delay1tcy_OneCycle _fd1oc_pmrd_sync(CLK_MASTER, MCU_PMRD, MCU_PMRD_sync);
 	
 // Handle host interface reads and writes
-	always @(posedge MCU_PMWR) begin
+	always @(posedge CLK_MASTER) begin
+		// Latch SRAM data when PMRD goes high
+		if (MCU_PMRD_sync && (MCU_ADDR[7:0] == 8'h03)) begin
+			SRAM_DQ_LAT <= SRAM_DQ;
+		end
+	
+		if (MCU_PMWR_sync) begin
 		/// Register Write
 		case (MCU_ADDR[7:0])
 			8'h00,
 			8'h01,
 			8'h02: begin			// SRAM_ADDR_{LOW,HIGH,UPPER}
 						// Note: other logic for this state below.
-						SYNC_WRITE_REG <= MCU_PMD;
 					 end
 
-			8'h03: begin			// SRAM_DATA_LOW
-						SRAM_DATA_OUT[7:0] <= MCU_PMD;
+				8'h03: begin			// SRAM_DATA
+							// Note: handled by Memory Write Controller (above)
 					 end
 
-			8'h04: begin			// DRIVE_CONTROL_LOW
+				8'h04: begin			// DRIVE_CONTROL
 						DRIVE_CONTROL[7:0] <= MCU_PMD;
 					 end
 
@@ -404,12 +415,12 @@ module top(
 
 			8'hFF: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
-						SYNC_WRITE_REG <= MCU_PMD;
 					 end
 
 			default: begin
 					 end
 		endcase
+		end
 	end
 
 	// Multiplexer for readback (MCU_PMD_OUT)
@@ -418,7 +429,7 @@ module top(
 			8'h00:	MCU_PMD_OUT = SRAM_A[7:0];						// SRAM_ADDR_LOW
 			8'h01:	MCU_PMD_OUT = SRAM_A[15:8];					// SRAM_ADDR_HIGH
 			8'h02:	MCU_PMD_OUT = {5'b00000, SRAM_A[18:16]};	// SRAM_ADDR_UPPER
-			8'h03:	MCU_PMD_OUT = SRAM_DQ[7:0];					// SRAM_DATA_LOW
+			8'h03:	MCU_PMD_OUT = SRAM_DQ_LAT[7:0];				// SRAM_DATA_LOW
 			8'h04:	MCU_PMD_OUT = MCO_TYPE[7:0];					// Microcode type low
 			8'h05:	MCU_PMD_OUT = MCO_TYPE[15:8];					// Microcode type high
 			8'h06:	MCU_PMD_OUT = MCO_VERSION[7:0];				// Microcode version low
@@ -477,16 +488,12 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Stepping controller
-	wire WRITE_STEP_REG;
-	Flag_CrossDomain _fcd_write_step_reg(
-					MCU_PMWR, MCU_PMWR && (MCU_ADDR[7:0] == 8'hFF),
-					CLK_MASTER, WRITE_STEP_REG);
 	StepController stepper(
 		CLK_MASTER,
 		STEP_CLK,
 		1'b0,	/// TODO: connect to main reset
-		SYNC_WRITE_REG,
-		WRITE_STEP_REG,
+		MCU_PMD,
+		(MCU_ADDR[7:0] == 8'hFF) && MCU_PMWR_sync,
 		SR_FDS_STEPPING,
 		FD_STEP,
 		FD_DIR,
