@@ -75,13 +75,27 @@ module top(
 	
 /////////////////////////////////////////////////////////////////////////////
 // Clock generation
-	// Instantiate a PLL to convert from 20MHz to 32MHz and 40MHz
+	// Instantiate a PLL to generate 32MHz and the master clock from the 20MHz
+	// crystal oscillator
 	wire CLK_PLL32MHZ, CLK_MASTER;
 	ClockGenerator clkgen(
 		.inclk0	(CLOCK),							// 20MHz input clock from the XTAL OSC
 		.c0		(CLK_PLL32MHZ),				// 32MHz DPLL clock (sync detector)
 		.c1		(CLK_MASTER)					// Master clock (40MHz as standard)
 		);
+
+	// Clock divider to produce 250us pulses from CLK_MASTER
+	reg [15:0] master_clk_counter;
+	always @(posedge CLK_MASTER) begin
+		if (master_clk_counter != 16'd10_000) begin
+			master_clk_counter <= master_clk_counter + 16'd1;
+		end else begin
+			master_clk_counter <= 16'd0;
+		end
+	end
+
+	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == 16'd5_000);
+	wire CKE_500US	=	(master_clk_counter == 16'd0);
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -115,7 +129,7 @@ module top(
 
 // Read/write signalling
 	// Write signal from Data Acquisition (DiscReader) module
-	wire		DAM_SRAM_WR;
+	wire			DAM_SRAM_WR;
 
 // Data out from the Acquisition (DiscReader) module
 	wire[7:0]	DAM_SRAM_WRITE_BUS;
@@ -457,37 +471,25 @@ module top(
 
 
 /////////////////////////////////////////////////////////////////////////////
-// Stepping rate generator
-
-// Clock divider to produce 250us pulses from CLK_MASTER
-	reg [15:0] master_clk_counter;
-	reg STEP_GEN_MASTER_CLK;
-	always @(posedge CLK_MASTER) begin
-		if (master_clk_counter != 16'd5000) begin
-			master_clk_counter <= master_clk_counter + 16'd1;
-		end else begin
-			master_clk_counter <= 16'd0;
-			STEP_GEN_MASTER_CLK <= ~STEP_GEN_MASTER_CLK;
-		end
-	end
-
-// Divide the 250us pulses down
+// Stepping controller
+	
+	// Divide the 250us pulses down to generate the stepping clock
 	reg [7:0] step_rate_counter;
 	reg step_ck_div_tgl;
-	always @(posedge STEP_GEN_MASTER_CLK) begin
-		if (step_rate_counter != STEP_RATE) begin
-			step_rate_counter <= step_rate_counter + 8'd1;
-		end else begin
-			step_ck_div_tgl <= ~step_ck_div_tgl;
-			step_rate_counter <= 8'd0;
+	always @(posedge CLK_MASTER) begin
+		if (CKE_250US) begin
+			if (step_rate_counter != STEP_RATE) begin
+				step_rate_counter <= step_rate_counter + 8'd1;
+			end else begin
+				step_ck_div_tgl <= ~step_ck_div_tgl;
+				step_rate_counter <= 8'd0;
+			end
 		end
 	end
 
 	wire STEP_CLK = step_ck_div_tgl;
 
-
-/////////////////////////////////////////////////////////////////////////////
-// Stepping controller
+	// The stepping controller itself
 	StepController stepper(
 		CLK_MASTER,
 		STEP_CLK,
@@ -520,7 +522,7 @@ module top(
 	AcquisitionControl _acqcontrol(
 		.CLK_32MHZ				(CLK_PLL32MHZ),
 		.CLK_MASTER				(CLK_MASTER),
-		.CLK_250US				(STEP_GEN_MASTER_CLK),
+		.CKE_500US				(CKE_500US),
 		.DATASEP_CLKSEL		(MFM_CLKSEL),
 		.START					(ACQCON_START_sync),
 		.ABORT					(ACQCON_ABORT_sync),
@@ -554,11 +556,10 @@ module top(
 	);
 
 	// Disc Writer track mark detector
-	reg CLK_500US;
-	always @(posedge STEP_GEN_MASTER_CLK) CLK_500US <= ~CLK_500US;
 	wire TMD_DISCWRITER;
 	TrackMarkDetector _trackmarkdetector_discwriter(
-		.clock					(CLK_500US),
+		.clock					(CLK_MASTER),
+		.cke						(CKE_500US),
 		.reset					(ACQCON_ABORT_sync),
 		.index					(FD_INDEX_IN),
 		.threshold				(HSTMD_THRESH_WRITE),

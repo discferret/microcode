@@ -2,8 +2,9 @@
  * Track-mark detector for hard-sectored discs
  */
 
-module TrackMarkDetector(clock, reset, index, threshold, detect);
+module TrackMarkDetector(clock, cke, reset, index, threshold, detect);
 	input					clock;			// clock input, positive-edge-triggered
+	input					cke;				// clock enable, positive-true
 	input					reset;			// reset input, positive-edge-triggered
 	input					index;			// index pulse input, active high
 	input		[7:0]		threshold;		// threshold value
@@ -16,7 +17,9 @@ module TrackMarkDetector(clock, reset, index, threshold, detect);
 		if (index) begin
 			timer <= 8'b0;
 		end else begin
-			timer <= timer + 8'd1;
+			if (cke) begin
+				timer <= timer + 8'd1;
+			end
 		end
 	end
 

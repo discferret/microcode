@@ -1,7 +1,7 @@
 module AcquisitionControl(
 	CLK_32MHZ,
 	CLK_MASTER,
-	CLK_250US,
+	CKE_500US,
 	DATASEP_CLKSEL,
 	START, ABORT,
 	FD_INDEX_IN,
@@ -23,7 +23,7 @@ module AcquisitionControl(
 
 	input					CLK_32MHZ;					// 32MHz data-separator clock
 	input					CLK_MASTER;					// Master clock
-	input					CLK_250US;					// 250us-per-cycle clock
+	input					CKE_500US;					// 500us-per-cycle clock enable
 	input		[1:0]		DATASEP_CLKSEL;			// Data separator clock select bits
 	input					START, ABORT;				// START and ABORT register bits
 	input					FD_INDEX_IN;				// INDEX pulse, +ve active
@@ -49,13 +49,23 @@ module AcquisitionControl(
 /////////////////////////////////////////////////////////////////////////////
 // Track-mark detectors
 
-	// Divide 250us clock from step-rate counter down to 500us
-	reg CLK_500US;
-	always @(posedge CLK_250US) CLK_500US <= ~CLK_500US;
-
 	wire HSTMD_START_EVT_DETECTED, HSTMD_STOP_EVT_DETECTED;
-	TrackMarkDetector _tmd_start(CLK_500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_START, HSTMD_START_EVT_DETECTED);
-	TrackMarkDetector _tmd_stop (CLK_500US, ABORT, FD_INDEX_IN, HSTMD_THRESH_STOP,  HSTMD_STOP_EVT_DETECTED );
+	TrackMarkDetector _trackmarkdetector_start(
+		.clock					(CLK_MASTER),
+		.cke						(CKE_500US),
+		.reset					(ABORT),
+		.index					(FD_INDEX_IN),
+		.threshold				(HSTMD_THRESH_START),
+		.detect					(HSTMD_START_EVT_DETECTED)
+	);
+	TrackMarkDetector _trackmarkdetector_stop(
+		.clock					(CLK_MASTER),
+		.cke						(CKE_500US),
+		.reset					(ABORT),
+		.index					(FD_INDEX_IN),
+		.threshold				(HSTMD_THRESH_STOP),
+		.detect					(HSTMD_STOP_EVT_DETECTED)
+	);
 
 
 /////////////////////////////////////////////////////////////////////////////
