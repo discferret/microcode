@@ -64,12 +64,18 @@ module top(
 
 
 /////////////////////////////////////////////////////////////////////////////
+// System version numbers
+	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
+	localparam	MCO_VERSION	= 16'h001A;		// Microcode version
+
+
+/////////////////////////////////////////////////////////////////////////////
 // Unused I/O pins
-//	assign	FD_WRDATA	= 1'b1;
-//	assign	FD_WRGATE	= 1'b1;
+	// High Speed I/O. TO BE IMPLEMENTED!
 	assign	HSIO_PORT	= 4'hZ;
 
-	// SRAM -- chip select, etc.
+	// SRAM chip select -- we keep the SRAM selected to get the fastest
+	// access times.
 	assign	SRAM_CE_n	= 1'b0;
 
 	
@@ -87,7 +93,7 @@ module top(
 	// Clock divider to produce 250us pulses from CLK_MASTER
 	reg [15:0] master_clk_counter;
 	always @(posedge CLK_MASTER) begin
-		if (master_clk_counter != 16'd10_000) begin
+		if (master_clk_counter < 16'd10_000) begin
 			master_clk_counter <= master_clk_counter + 16'd1;
 		end else begin
 			master_clk_counter <= 16'd0;
@@ -96,12 +102,6 @@ module top(
 
 	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == 16'd5_000);
 	wire CKE_500US	=	(master_clk_counter == 16'd0);
-
-
-/////////////////////////////////////////////////////////////////////////////
-// System version numbers
-	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h001A;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
