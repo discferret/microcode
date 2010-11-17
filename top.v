@@ -90,38 +90,51 @@ module top(
 		.c1		(CLK_MASTER)					// Master clock (40MHz as standard)
 		);
 
+	// NOTE: If you change the frequency of CLK_MASTER, then update this value!
+	localparam CLK_MASTER_FREQ = 32'd80_000_000;
+		
 	// Clock divider to produce 250us pulses from CLK_MASTER
+	// 250us = 4kHz
 	reg [15:0] master_clk_counter;
 	always @(posedge CLK_MASTER) begin
-		if (master_clk_counter < 16'd10_000) begin
+		if (master_clk_counter < (CLK_MASTER_FREQ / 32'd4_000)) begin
 			master_clk_counter <= master_clk_counter + 16'd1;
 		end else begin
 			master_clk_counter <= 16'd0;
 		end
 	end
 
-	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == 16'd5_000);
+	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd8_000));
 	wire CKE_500US	=	(master_clk_counter == 16'd0);
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Status LED
-/*
-	reg [31:0] status_led_counter;
-	reg status_led_r;
-	assign STATUS_LED = status_led_r;
 
-	always @(posedge CLK_MASTER) begin
-		if (status_led_counter > 32'd20_000_000) begin
-			status_led_counter <= 32'd0;
-			status_led_r <= ~status_led_r;
-		end else begin
-			status_led_counter <= status_led_counter + 1;
+// Set this parameter to a nonzero value to make the Status LED blink at ~2Hz
+// instead of lighting when the FPGA is busy.
+localparam STATUSLED_BLINK_ONLY = 0;
+
+	generate
+	if (STATUSLED_BLINK_ONLY) begin
+		// Uncomment this block to make the status LED 
+		reg [31:0] status_led_counter;
+		reg status_led_r;
+		assign STATUS_LED = status_led_r;
+
+		always @(posedge CLK_MASTER) begin
+			if (status_led_counter > (CLK_MASTER_FREQ / 2)) begin
+				status_led_counter <= 32'd0;
+				status_led_r <= ~status_led_r;
+			end else begin
+				status_led_counter <= status_led_counter + 1;
+			end
 		end
+	end else begin
+		// Status LED should be on if we're acquiring, or waiting for a trigger event
+		assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING);
 	end
-*/
-	// Status LED should be on if we're acquiring, or waiting for a trigger event
-	assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING);
+	endgenerate
 
 	
 /////////////////////////////////////////////////////////////////////////////
