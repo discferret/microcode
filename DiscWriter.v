@@ -244,7 +244,7 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 			writetimer <= 1'b0;
 			wrdata <= 1'b1;
 		end else if (wrdat_r == 1'b1) begin
-			writetimer <= 8'd30;
+			writetimer <= 8'd60;
 			wrdata <= 1'b0;
 		end else if (writetimer > 1'b0) begin
 			writetimer <= writetimer - 1'b1;
