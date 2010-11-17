@@ -145,7 +145,7 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 				ST_WRGATE: begin
 						// SET WRITE GATE						
 						// Load write gate, increment PC and jump back to INIT state
-						wrgate <= ~mdat[0];
+						wrgate <= ~cur_instr[0];
 						maddr_inc <= 1'b1;
 						state <= ST_LOOP;
 					end
