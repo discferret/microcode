@@ -107,6 +107,18 @@ module top(
 	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd8_000));
 	wire CKE_500US	=	(master_clk_counter == 16'd0);
 
+	
+/////////////////////////////////////////////////////////////////////////////
+// Clock counter
+
+// These 8-bit counters are incremented once per clock tick, and are used by
+// the ATE diagnostics to prove that the FPGA clock oscillator is functioning.
+// One clock counter handles the 20MHz clock, the other handles the PLL'd clock.
+reg [7:0] clock_ticker, clock_ticker_pll;
+
+always @(posedge CLOCK) clock_ticker <= clock_ticker + 8'b1;
+always @(posedge CLK_MASTER) clock_ticker_pll <= clock_ticker_pll + 8'b1;
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Status LED
@@ -470,6 +482,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h31:	MCU_PMD_OUT = ~SCRATCHPAD;						// Inverse Scratchpad register
 			8'h32:	MCU_PMD_OUT = 8'h55;								// Fixed 0x55 register
 			8'h33:	MCU_PMD_OUT = 8'hAA;								// Fixed 0xAA register
+			8'h34:	MCU_PMD_OUT = clock_ticker;					// Clock ticker (20MHz)
+			8'h35:	MCU_PMD_OUT = clock_ticker_pll;				// Clock ticker (PLL)
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
