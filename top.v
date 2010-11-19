@@ -468,6 +468,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
 			8'h30:	MCU_PMD_OUT = SCRATCHPAD;						// Scratchpad register
 			8'h31:	MCU_PMD_OUT = ~SCRATCHPAD;						// Inverse Scratchpad register
+			8'h32:	MCU_PMD_OUT = 8'h55;								// Fixed 0x55 register
+			8'h33:	MCU_PMD_OUT = 8'hAA;								// Fixed 0xAA register
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
