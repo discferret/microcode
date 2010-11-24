@@ -83,11 +83,12 @@ module top(
 // Clock generation
 	// Instantiate a PLL to generate 32MHz and the master clock from the 20MHz
 	// crystal oscillator
-	wire CLK_PLL32MHZ, CLK_MASTER;
+	wire CLK_PLL32MHZ, CLK_MASTER, PLL_LOCKED;
 	ClockGenerator clkgen(
 		.inclk0	(CLOCK),							// 20MHz input clock from the XTAL OSC
 		.c0		(CLK_PLL32MHZ),				// 32MHz DPLL clock (sync detector)
-		.c1		(CLK_MASTER)					// Master clock (40MHz as standard)
+		.c1		(CLK_MASTER),					// Master clock (40MHz as standard)
+		.locked	(PLL_LOCKED)					// PLL Lock status output
 		);
 
 	// NOTE: If you change the frequency of CLK_MASTER, then update this value!
@@ -144,7 +145,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		end
 	end else begin
 		// Status LED should be on if we're acquiring, or waiting for a trigger event
-		assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING);
+		// It will also stick on if the PLL is jammed...
+		assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING | !PLL_LOCKED);
 	end
 	endgenerate
 
@@ -345,7 +347,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	
 // Handle host interface reads and writes
 	always @(posedge CLK_MASTER) begin
-		// Latch SRAM data when PMRD goes high
+		// Hold SRAM data steady when PMRD goes high
 		if (!MCU_PMRD_sync && (MCU_ADDR[7:0] == 8'h03)) begin
 			SRAM_DQ_LAT <= SRAM_DQ;
 		end
