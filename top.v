@@ -71,8 +71,6 @@ module top(
 
 /////////////////////////////////////////////////////////////////////////////
 // Unused I/O pins
-	// High Speed I/O. TO BE IMPLEMENTED!
-	assign	HSIO_PORT	= 4'hZ;
 
 	// SRAM chip select -- we keep the SRAM selected to get the fastest
 	// access times.
@@ -148,6 +146,22 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		// It will also stick on if the PLL is jammed...
 		assign STATUS_LED = !(ACQSTAT_WAITING | ACQSTAT_ACQUIRING | ACQSTAT_WRITING | !PLL_LOCKED);
 	end
+	endgenerate
+	
+	
+/////////////////////////////////////////////////////////////////////////////
+// High Speed I/O Port
+
+	// HSIO Direction and Data registers
+	reg [3:0] HSIO_DIR, HSIO_DATA;
+
+	// HSIO I/O logic
+	generate
+		genvar i;
+		for (i = 0; i < 4; i = i + 1)
+		begin : hsioloop
+			assign HSIO_PORT[i] = HSIO_DIR[i] ? 1'bZ : HSIO_DATA[i];
+		end
 	endgenerate
 
 	
@@ -450,6 +464,14 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						SCRATCHPAD <= MCU_PMD[7:0];
 					 end
 
+			8'hE0: begin			// HSIO_DIR
+						HSIO_DIR <= MCU_PMD[3:0];
+					 end
+
+			8'hE1: begin			// HSIO_DATA
+						HSIO_DATA <= MCU_PMD[3:0];
+					 end
+
 			8'hF0: begin			// STEP_RATE -- Disc drive step rate
 						STEP_RATE <= MCU_PMD;
 					 end
@@ -486,6 +508,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h33:	MCU_PMD_OUT = 8'hAA;								// Fixed 0xAA register
 			8'h34:	MCU_PMD_OUT = clock_ticker;					// Clock ticker (20MHz)
 			8'h35:	MCU_PMD_OUT = clock_ticker_pll;				// Clock ticker (PLL)
+			8'hE1:	MCU_PMD_OUT = HSIO_PORT;						// HSIO readback
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
 	end
