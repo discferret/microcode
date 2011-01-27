@@ -92,13 +92,13 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 									// 0b1nnn_nnnn: TIMER LOAD n
 									state <= ST_TIMER;
 								end else
-								if (mdat == 8'b0111_1111) begin
-									// 0b0111_1111: STOP
-									state <= ST_IDLE;
-								end else
 								if (mdat[7:6] == 2'b01) begin
 									// 0b01nn_nnnn: WAIT n INDEX PULSES
 									state <= ST_WAITIDX;
+								end else
+								if (mdat == 8'b0011_1111) begin
+									// 0b0011_1111: STOP
+									state <= ST_IDLE;
 								end else
 								if (mdat == 8'b0000_0011) begin
 									// 0b0000_0011: WAIT HSTMD
