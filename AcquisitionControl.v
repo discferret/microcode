@@ -1,5 +1,5 @@
 module AcquisitionControl(
-	CLK_32MHZ,
+	CLK_DATASEP,
 	CLK_MASTER,
 	CKE_500US,
 	DATASEP_CLKSEL,
@@ -21,7 +21,7 @@ module AcquisitionControl(
 	debug
 );
 
-	input					CLK_32MHZ;					// 32MHz data-separator clock
+	input					CLK_DATASEP;				// Data-separator clock
 	input					CLK_MASTER;					// Master clock
 	input					CKE_500US;					// 500us-per-cycle clock enable
 	input		[1:0]		DATASEP_CLKSEL;			// Data separator clock select bits
@@ -45,6 +45,9 @@ module AcquisitionControl(
 	
 	output	[3:0]		debug;
 
+	// Max counter value for PJL data separator.
+	// 16 for 32-clock (16MHz=500kbps), 20 for 40-clock (20MHz=500kbps)
+	parameter PJL_COUNTER_MAX = 8'd16;
 
 /////////////////////////////////////////////////////////////////////////////
 // Track-mark detectors
@@ -71,9 +74,10 @@ module AcquisitionControl(
 /////////////////////////////////////////////////////////////////////////////
 // Clock dividers and selectors for the data separator
 
-	// Divide down the 32MHz reference to get 16MHz, 8MHz and 4MHz
+	// Divide down the data separator clock to get F/2, F/4 and F/8
+	// i.e. 16MHz, 8MHz, 4MHz for a 32MHz input.
 	reg [2:0] DatasepClkDiv;
-	always @(posedge CLK_32MHZ) DatasepClkDiv <= DatasepClkDiv + 3'd1;
+	always @(posedge CLK_DATASEP) DatasepClkDiv <= DatasepClkDiv + 3'd1;
 
 	// Clock multiplexer
 /*	// Latch clock-select only when all clocks are low
@@ -83,18 +87,18 @@ module AcquisitionControl(
 */
 	// Select the relevant clock
 	reg DATASEP_CLK_pre;
-	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_32MHZ) begin
+	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_DATASEP) begin
 		case (DATASEP_CLKSEL)
-			2'b00:	DATASEP_CLK_pre = CLK_32MHZ;				// 1Mbps		(32MHz clk)
-			2'b01:	DATASEP_CLK_pre = DatasepClkDiv[0];		// 500kbps	(16MHz clk)
-			2'b10:	DATASEP_CLK_pre = DatasepClkDiv[1];		// 250kbps	(8 MHz clk)
-			default:	DATASEP_CLK_pre = DatasepClkDiv[2];		// 125kbps	(4 MHz clk)
+			2'b00:	DATASEP_CLK_pre = CLK_DATASEP;			// 1Mbps		(F/1 clk)
+			2'b01:	DATASEP_CLK_pre = DatasepClkDiv[0];		// 500kbps	(F/2 clk)
+			2'b10:	DATASEP_CLK_pre = DatasepClkDiv[1];		// 250kbps	(F/4 clk)
+			default:	DATASEP_CLK_pre = DatasepClkDiv[2];		// 125kbps	(F/8 clk)
 		endcase
 	end
 	
-	// Sync clock against 32MHz master clock to remove glitches
+	// Sync clock against master clock to remove glitches
 	reg DATASEP_MASTER_CLK;
-	always @(posedge CLK_32MHZ) DATASEP_MASTER_CLK <= DATASEP_CLK_pre;
+	always @(posedge CLK_DATASEP) DATASEP_MASTER_CLK <= DATASEP_CLK_pre;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -104,18 +108,20 @@ module AcquisitionControl(
 	wire SYNCWD_START_EVT_DETECTED, SYNCWD_STOP_EVT_DETECTED;
 
 	// Sync-word detector for START condition
+	defparam _mfm_syncdet_start.PJL_COUNTER_MAX = PJL_COUNTER_MAX;
 	MFMSyncWordDetector _mfm_syncdet_start(
-		.CLK_PLL32MHZ			(CLK_32MHZ),
-		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
+		.CLK_DATASEP			(CLK_DATASEP),
+		.CLK_DATASEP_DIVIDED	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(MFM_SYNCWORD_START),
 		.MASK_IN					(MFM_MASK_START),
 		.SYNC_WORD_DETECTED	(SYNCWD_START_EVT_DETECTED)
 	);
 
+	defparam _mfm_syncdet_stop.PJL_COUNTER_MAX = PJL_COUNTER_MAX;
 	MFMSyncWordDetector _mfm_syncdet_stop(
-		.CLK_PLL32MHZ			(CLK_32MHZ),
-		.DATASEP_MASTER_CLK	(DATASEP_MASTER_CLK),
+		.CLK_DATASEP			(CLK_DATASEP),
+		.CLK_DATASEP_DIVIDED	(DATASEP_MASTER_CLK),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(MFM_SYNCWORD_STOP),
 		.MASK_IN					(MFM_MASK_STOP),
@@ -125,13 +131,13 @@ module AcquisitionControl(
 	// Synchronise sync-detect flags from PLL32 to CLK40
 	wire SYNCWD_START_EVT_DETECTED_sync;
 	Signal_CrossDomain_As_Flag _scdaf_syncwd_start_detected(
-		.clkA (CLK_32MHZ),	.SignalIn  (SYNCWD_START_EVT_DETECTED), 
+		.clkA (CLK_DATASEP),	.SignalIn  (SYNCWD_START_EVT_DETECTED), 
 		.clkB (CLK_MASTER),	.SignalOut (SYNCWD_START_EVT_DETECTED_sync)
 	);
 
 	wire SYNCWD_STOP_EVT_DETECTED_sync;
 	Signal_CrossDomain_As_Flag _scdaf_syncwd_stop_detected(
-		.clkA (CLK_32MHZ),	.SignalIn  (SYNCWD_STOP_EVT_DETECTED), 
+		.clkA (CLK_DATASEP),	.SignalIn  (SYNCWD_STOP_EVT_DETECTED), 
 		.clkB (CLK_MASTER),	.SignalOut (SYNCWD_STOP_EVT_DETECTED_sync)
 	);
 

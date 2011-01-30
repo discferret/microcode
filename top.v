@@ -66,7 +66,7 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
 	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h001B;		// Microcode version
+	localparam	MCO_VERSION	= 16'h001C;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -79,18 +79,20 @@ module top(
 	
 /////////////////////////////////////////////////////////////////////////////
 // Clock generation
-	// Instantiate a PLL to generate 32MHz and the master clock from the 20MHz
-	// crystal oscillator
-	wire CLK_PLL32MHZ, CLK_MASTER, PLL_LOCKED;
+	// Instantiate a PLL to generate the master and data-separator clocks from
+	// the 20MHz crystal oscillator input
+	wire CLK_DATASEP, CLK_MASTER, PLL_LOCKED;
 	ClockGenerator clkgen(
 		.inclk0	(CLOCK),							// 20MHz input clock from the XTAL OSC
-		.c0		(CLK_PLL32MHZ),				// 32MHz DPLL clock (sync detector)
-		.c1		(CLK_MASTER),					// Master clock (40MHz as standard)
+		.c0		(CLK_DATASEP),					// 40MHz DPLL clock (sync detector)
+		.c1		(CLK_MASTER),					// 100MHz master clock
 		.locked	(PLL_LOCKED)					// PLL Lock status output
 		);
 
 	// NOTE: If you change the frequency of CLK_MASTER, then update this value!
-	localparam CLK_MASTER_FREQ = 32'd80_000_000;
+	localparam CLK_MASTER_FREQ = 32'd100_000_000;
+	// NOTE: If you change the frequency of CLK_DATASEP, then update this value!
+	localparam CLK_DATASEP_FREQ = 32'd40_000_000;
 		
 	// Clock divider to produce 250us pulses from CLK_MASTER
 	// 250us = 4kHz
@@ -573,8 +575,13 @@ localparam STATUSLED_BLINK_ONLY = 0;
 					CLK_MASTER, ACQCON_WRITE_sync);
 
 	// Acquisition control unit
+	// NOTE: Set PJL_COUNTER_MAX to half of the data separator clock frequency in MHz.
+	//   e.g. If CLK_DATASEP = 40MHz, set this to 20.
+	//        If CLK_DATASEP = 32MHz, set this to 16.
+	// This is done auto-magically, assuming CLK_DATASEP_FREQ is set correctly above!
+	defparam _acqcontrol.PJL_COUNTER_MAX = CLK_DATASEP_FREQ / 32'd2_000_000;
 	AcquisitionControl _acqcontrol(
-		.CLK_32MHZ				(CLK_PLL32MHZ),
+		.CLK_DATASEP			(CLK_DATASEP),
 		.CLK_MASTER				(CLK_MASTER),
 		.CKE_500US				(CKE_500US),
 		.DATASEP_CLKSEL		(MFM_CLKSEL),

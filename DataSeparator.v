@@ -1,15 +1,20 @@
 module DataSeparator(MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 
-	input				MASTER_CLK;			// Master Clock -- Data rate * 16
+	input				MASTER_CLK;			// Master Clock -- Data rate * PJL_COUNTER_MAX
 	input				FD_RDDATA_IN;		// L->H on flux transition
 	output			SHAPED_DATA;		// Reshaped data pulses
 	output			DWIN;					// Data Window
+
+	// Max counter value for PJL data separator.
+	// 16 for 32-clock (16MHz=500kbps), 20 for 40-clock (20MHz=500kbps)
+	parameter PJL_COUNTER_MAX = 8'd16;
 
 /////////////////////////////////////////////////////////////////////////////
 // "Phase-jerked loop" data separator
 // Designed by James Thompson, Analog Innovations, Phoenix AZ.
 //   Original schematic: http://www.analog-innovations.com/SED/FloppyDataExtractor.pdf
 // Verilog implementation by Phil Pemberton
+// Core rewritten 2010-01-29 to get more flexibility for clocking
 
 	// Declare flipflops
 	reg u2a, u2b;
@@ -29,7 +34,7 @@ module DataSeparator(MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 	always @(posedge u2b_clk) begin
 		u2b <= u2a;
 	end
-	
+
 	// U4A -- provides SHAPED_DATA
 	reg SHAPED_DATA;
 	always @(posedge u2b_clk or negedge u2b) begin
@@ -39,41 +44,25 @@ module DataSeparator(MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 			SHAPED_DATA <= u2b;		// clock; D=u2b's output
 		end
 	end
-	
-	// PJL shift register
-	reg [7:0] pjl_shifter;
+
+	//// PJL counter
+	reg [7:0] pjl_counter;
+	reg DWIN;
 	always @(posedge MASTER_CLK or negedge u2b) begin
 		if (!u2b) begin
-			// Asynchronous CLEAR
-			pjl_shifter <= 8'b0000_0000;
+			// Asynchronous clear
+			pjl_counter <= 8'd0;
 		end else begin
-			// Clock
-			pjl_shifter <= {pjl_shifter[6:0], !pjl_shifter[7]};
-		end
-	end
-	
-/*	// Latch the state of the SR output
-	reg srout;
-	always @(posedge MASTER_CLK) begin
-		srout <= pjl_shifter[7];
-	end
-	
-	// PJL output register
-	reg DWIN;
-	always @(posedge srout) begin
-		DWIN <= ~DWIN;
-	end
-*/
-	// Slightly different data-window implementation that uses a clock enable
-	// instead of a ripple clock, thus keeping everything synchronous to
-	// MASTER_CLK. Also saves a flipflop. Win-win.
-	wire pjcke;
-	Flag_Delay1tcy_OneCycle _fd1_pjls7(MASTER_CLK, pjl_shifter[7], pjcke);
+			// Increment PJL counter
+			pjl_counter <= pjl_counter + 8'd1;
 
-	reg DWIN;
-	always @(posedge MASTER_CLK) begin
-		if (pjcke) begin
-			DWIN <= ~DWIN;
+			if (pjl_counter == (PJL_COUNTER_MAX / 8'd2)) begin
+				// Hit half-way point. Flip data window.
+				DWIN <= ~DWIN;
+			end else if (pjl_counter == PJL_COUNTER_MAX) begin
+				// Hit max count. Reset counter.
+				pjl_counter <= 8'd0;
+			end
 		end
 	end
 

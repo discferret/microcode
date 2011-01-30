@@ -1,31 +1,35 @@
 module MFMSyncWordDetector(
-	CLK_PLL32MHZ,
-	DATASEP_MASTER_CLK,
+	CLK_DATASEP,
+	CLK_DATASEP_DIVIDED,
 	FD_RDDATA_IN,
 	SYNC_WORD_IN,
 	MASK_IN,
 	SYNC_WORD_DETECTED
 );
 
-	input					CLK_PLL32MHZ;				// Master clock
-	input					DATASEP_MASTER_CLK;		// Data separator master clock
+	input					CLK_DATASEP;				// Master clock
+	input					CLK_DATASEP_DIVIDED;		// Data separator master clock
 	input					FD_RDDATA_IN;				// Floppy disc read-data in
 	input		[15:0]	SYNC_WORD_IN;				// Syncword to look for
 	input		[15:0]	MASK_IN;						// Syncword mask
 	output				SYNC_WORD_DETECTED;		// 1 if sync word detected
 
+	// Max counter value for PJL data separator.
+	// 16 for 32-clock (16MHz=500kbps), 20 for 40-clock (20MHz=500kbps)
+	parameter PJL_COUNTER_MAX = 8'd16;
 
 /////////////////////////////////////////////////////////////////////////////
 // MFM sync word detector
 
 	// Data separator
 	wire SHAPED_DATA, DWIN;
-	DataSeparator _datasep(DATASEP_MASTER_CLK, FD_RDDATA_IN, SHAPED_DATA, DWIN);
+	defparam _datasep.PJL_COUNTER_MAX = PJL_COUNTER_MAX;
+	DataSeparator _datasep(CLK_DATASEP_DIVIDED, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 	
 	// Detect transitions on DWIN
 	reg [1:0] dwin_transition_detector;
 	reg dwin_transition_r;
-	always @(posedge CLK_PLL32MHZ) begin
+	always @(posedge CLK_DATASEP) begin
 		dwin_transition_detector <= {dwin_transition_detector[0], DWIN};
 		dwin_transition_r <= (dwin_transition_detector[0] ^ dwin_transition_detector[1]);
 	end
@@ -48,7 +52,7 @@ module MFMSyncWordDetector(
 	end
 
 	reg SYNC_WORD_DETECTED;
-	always @(posedge DATASEP_MASTER_CLK)
+	always @(posedge CLK_DATASEP_DIVIDED)
 		SYNC_WORD_DETECTED <= ((sync_shift_r & MASK_IN) == (SYNC_WORD_IN & MASK_IN));
 
 endmodule
