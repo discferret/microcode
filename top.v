@@ -66,7 +66,7 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
 	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h001C;		// Microcode version
+	localparam	MCO_VERSION	= 16'h001D;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -176,20 +176,34 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 // Data out from the Acquisition (DiscReader) module
 	wire[7:0]	DAM_SRAM_WRITE_BUS;
-	
-// Data bus from the MCU Interface
-	reg[7:0]		SRAM_DATA_OUT;
-	
-// Bus arbitration: DAM has the write bus when ACQSTAT_WAITING or ACQSTAT_ACQUIRING
-	wire[7:0]	SRAM_DQ_WR;
-	assign		SRAM_DQ_WR	= ((ACQSTAT_WAITING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : SRAM_DATA_OUT;
 
-// SDRAM data bus is driven by us if OE is inactive, else it's Hi-Z
-	assign		SRAM_DQ		= SRAM_OE_n ? SRAM_DQ_WR : 8'hzz;
+// Data bus from the MCU Interface
+	reg[7:0]		PMD_LATCHED;
+	always @(posedge MWC_WRITE_SRAM_DATA) begin
+		PMD_LATCHED <= MCU_PMD;
+	end
+
+// SRAM data bus is driven by us if OE is inactive, else it's Hi-Z
+	wire[7:0]	FIFO_Q;
+	assign		SRAM_DQ		= SRAM_OE_n ? /*SRAM_DQ_WR*/ FIFO_Q : 8'hzz;
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Memory write controller
+
+	// TODO: FIFO Full should cause an acquisition abort
+	wire FIFO_EMPTY, FIFO_FULL;
+	ramfifo _ramfifo(
+		.clock		(CLK_MASTER),
+		// Bus arbitration: DAM has the write bus when ACQSTAT_WAITING or ACQSTAT_ACQUIRING
+		.data			(((ACQSTAT_WAITING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : PMD_LATCHED),
+		.rdreq		(MWC_CUR_STATE == MWC_S_OEIA),
+		.sclr			(ACQCON_ABORT_sync),
+		.wrreq		(MWC_WRITE_SRAM_DATA || DAM_SRAM_WR),
+		.empty		(FIFO_EMPTY),
+		.full			(FIFO_FULL),
+		.q				(FIFO_Q)
+	);
 
 	// SRAM write/output enable
 	reg SRAM_WE_n_r, SRAM_OE_n_r;
@@ -222,7 +236,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 								SRAM_OE_n_r			<= 1'b0;
 								SRA_INCREMENT_MWC	<= 1'b0;
 
-								if ((MWC_WRITE_SRAM_DATA) || (DAM_SRAM_WR)) begin
+								if (!FIFO_EMPTY) begin
 									MWC_CUR_STATE	<= MWC_S_OEIA;
 								end else begin
 									MWC_CUR_STATE	<= MWC_S_IDLE;
@@ -231,9 +245,9 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 			MWC_S_OEIA:		begin
 								// S_OEIA: Make OE inactive and load data
+								// FIFO latches data into its output FF
 								SRAM_OE_n_r			<= 1'b1;
 								MWC_CUR_STATE		<= MWC_S_WRITE;
-								SRAM_DATA_OUT[7:0] <= MCU_PMD;
 							end
 
 			MWC_S_WRITE:	begin
@@ -244,6 +258,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 							end
 							
 			MWC_S_WRITEEND:begin
+								// S_WRITEEND: End write cycle
 								SRAM_WE_n_r			<= 1'b1;
 								MWC_CUR_STATE		<= MWC_S_INCADDR;
 							end
@@ -500,7 +515,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h06:	MCU_PMD_OUT = MCO_VERSION[7:0];				// Microcode version low
 			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
 			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
-							{5'b0, ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING};
+							// ACQUIRING is set active if the fifo is still draining.
+							{5'b0, ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING | (!FIFO_EMPTY)};
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
 							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
