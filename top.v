@@ -121,7 +121,7 @@ module top(
 	end
 
 	// Index frequency reference clock
-	wire CKE_INDEXFREQ	=	(master_clk_counter == 16'd0);
+	wire CKE_INDEXFREQ	=	(index_clk_counter == 16'd0);
 
 	
 /////////////////////////////////////////////////////////////////////////////
