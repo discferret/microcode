@@ -12,14 +12,25 @@ module TrackMarkDetector(clock, cke, reset, index, threshold, detect);
 
 /////////////////////////////////////////////////////////////////////////////
 // Time counter and latch
+
+	// Synchronise index with clock
+	reg [2:0] INDEX_SYNC_r;
+	always @(posedge clock) INDEX_SYNC_r <= {INDEX_SYNC_r[0], index};
+	
+	// Detect rising edge of index pulse
+	wire INDEX_RISING_EDGE = !INDEX_SYNC_r[1] && INDEX_SYNC_r[0];
+	
+	// Measure time between last index pulse and this one
 	reg [7:0] timer;
 	reg [7:0] tlatch;
-	always @(posedge clock or posedge index) begin
-		if (index) begin
+	always @(posedge clock) begin
+		if (INDEX_RISING_EDGE) begin
+			// Index pulse -- save current frequency count and clear counter
 			tlatch <= timer;
-			timer <= 8'b0;
+			timer <= 8'd0;
 		end else begin
 			if (cke) begin
+				// Clocked with enable active. Increment index frequency count.
 				timer <= timer + 8'd1;
 			end
 		end
