@@ -11,10 +11,12 @@ module TrackMarkDetector(clock, cke, reset, index, threshold, detect);
 	output				detect;			// detection state output
 
 /////////////////////////////////////////////////////////////////////////////
-// Time counter
+// Time counter and latch
 	reg [7:0] timer;
+	reg [7:0] tlatch;
 	always @(posedge clock or posedge index) begin
 		if (index) begin
+			tlatch <= timer;
 			timer <= 8'b0;
 		end else begin
 			if (cke) begin
@@ -24,24 +26,26 @@ module TrackMarkDetector(clock, cke, reset, index, threshold, detect);
 	end
 
 /////////////////////////////////////////////////////////////////////////////
-// Time latch
-	reg [7:0] tlatch;
-	always @(posedge index) begin
-		tlatch <= timer;
-	end
-
-/////////////////////////////////////////////////////////////////////////////
 // Track last few output states -- must see delta>threshold, THEN
-// delta<=threshold in order to trigger. To do this, we track the
+// delta<=threshold twice in order to trigger. To do this, we track the
 // previous and current index pulse states.
-	reg [1:0] prevstate;
+	reg [2:0] prevstate;
 	always @(posedge index) begin
-		prevstate <= {prevstate[0], (tlatch <= threshold)};
+		prevstate <= {prevstate[1:0], (tlatch <= threshold)};
 	end
 
 /////////////////////////////////////////////////////////////////////////////
-// Detect logic -- prevdelta > threshold, thisdelta <= threshold.
-	assign detect = (!prevstate[1] && prevstate[0]);
+// Detect logic -- 
+//   First delta:             longer than threshold
+//   Second and third deltas: shorter than threshold
+//
+// In a sense, we're after:
+//          _          _      _      _
+//   ______/ \________/ \____/ \____/ \_____
+// sector: n-1         n     n.5     1
+//                                  ^^^ INDEX HERE
+//
+	assign detect = (!prevstate[2] && prevstate[1] && prevstate[0]);
 
 endmodule
 
