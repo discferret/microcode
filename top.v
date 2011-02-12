@@ -328,14 +328,14 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	reg	[7:0]		INDEX_FREQ_LOW;		// Index frequency low, latched when index freq high reg is read
 	
 	always @(posedge CLK_MASTER) begin
-		if (CKE_250US) begin
-			// Increment index frequency count if CKE is active
-			INDEX_FREQ <= INDEX_FREQ + 16'd1;
+		if (INDEX_RISING_EDGE) begin
+			// index pulse -- save current frequency count and clear counter
+			INDEX_FREQ_LAT <= INDEX_FREQ;
+			INDEX_FREQ <= 16'd0;
 		end else begin
-			if (INDEX_RISING_EDGE) begin
-				// index pulse -- save current frequency count and clear counter
-				INDEX_FREQ_LAT <= INDEX_FREQ;
-				INDEX_FREQ <= 16'd0;
+			if (CKE_250US) begin
+				// Increment index frequency count if CKE is active
+				INDEX_FREQ <= INDEX_FREQ + 16'd1;
 			end
 		end
 	end
