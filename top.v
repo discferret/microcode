@@ -94,18 +94,18 @@ module top(
 	// NOTE: If you change the frequency of CLK_DATASEP, then update this value!
 	localparam CLK_DATASEP_FREQ = 32'd40_000_000;
 		
-	// Clock divider to produce 250us pulses from CLK_MASTER
+	// Clock divider to produce pulses 500us and 250us apart from CLK_MASTER
 	// 250us = 4kHz
 	reg [15:0] master_clk_counter;
 	always @(posedge CLK_MASTER) begin
-		if (master_clk_counter < (CLK_MASTER_FREQ / 32'd4_000)) begin
+		if (master_clk_counter < (CLK_MASTER_FREQ / 32'd2_000)) begin
 			master_clk_counter <= master_clk_counter + 16'd1;
 		end else begin
 			master_clk_counter <= 16'd0;
 		end
 	end
 
-	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd8_000));
+	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd4_000));
 	wire CKE_500US	=	(master_clk_counter == 16'd0);
 
 	
