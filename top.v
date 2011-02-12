@@ -95,7 +95,7 @@ module top(
 	localparam CLK_DATASEP_FREQ = 32'd40_000_000;
 		
 	// Clock divider to produce pulses 500us and 250us apart from CLK_MASTER
-	// 250us = 4kHz
+	// 250us = 4kHz. We set the counter for 500us pulses, then generate an extra pulse.
 	reg [15:0] master_clk_counter;
 	always @(posedge CLK_MASTER) begin
 		if (master_clk_counter < (CLK_MASTER_FREQ / 32'd2_000)) begin
@@ -105,8 +105,23 @@ module top(
 		end
 	end
 
-	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd4_000));
+	// 500us only generates one pulse per counter cycle
 	wire CKE_500US	=	(master_clk_counter == 16'd0);
+	// 250us generates an extra pulse mid-count
+	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd4_000));
+
+	// Clock divider -- converts CLK_MASTER into a 10us repetitive pulse train
+	reg [15:0] index_clk_counter;
+	always @(posedge CLK_MASTER) begin
+		if (index_clk_counter < (CLK_MASTER_FREQ / 32'd100_000)) begin
+			index_clk_counter <= index_clk_counter + 16'd1;
+		end else begin
+			index_clk_counter <= 16'd0;
+		end
+	end
+
+	// Index frequency reference clock
+	wire CKE_INDEXFREQ	=	(master_clk_counter == 16'd0);
 
 	
 /////////////////////////////////////////////////////////////////////////////
@@ -333,7 +348,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			INDEX_FREQ_LAT <= INDEX_FREQ;
 			INDEX_FREQ <= 16'd0;
 		end else begin
-			if (CKE_250US) begin
+			if (CKE_INDEXFREQ) begin
 				// Increment index frequency count if CKE is active
 				INDEX_FREQ <= INDEX_FREQ + 16'd1;
 			end
