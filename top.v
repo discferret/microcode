@@ -313,6 +313,47 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 
 /////////////////////////////////////////////////////////////////////////////
+// Index frequency measurement logic
+
+	// Synchronise index with clock
+	reg [2:0] INDEX_SYNC_r;
+	always @(posedge CLK_MASTER) INDEX_SYNC_r <= {INDEX_SYNC_r[0], FD_INDEX_IN};
+	
+	// Detect rising edge of index pulse
+	wire INDEX_RISING_EDGE = !INDEX_SYNC_r[1] && INDEX_SYNC_r[0];
+
+	// Measure index frequency
+	reg	[15:0]	INDEX_FREQ;				// index frequency counter
+	reg	[15:0]	INDEX_FREQ_LAT;		// index frequency latch
+	reg	[7:0]		INDEX_FREQ_LOW;		// Index frequency low, latched when index freq high reg is read
+	
+	always @(posedge CLK_MASTER) begin
+		if (CKE_250US) begin
+			// Increment index frequency count if CKE is active
+			INDEX_FREQ <= INDEX_FREQ + 16'd1;
+		end else begin
+			if (INDEX_RISING_EDGE) begin
+				// index pulse -- save current frequency count and clear counter
+				INDEX_FREQ_LAT <= INDEX_FREQ;
+				INDEX_FREQ <= 16'd0;
+			end
+		end
+	end
+	
+	// Latch low byte of INDEX_FREQ_LAT when the high byte is read
+	// This stops us getting the high byte of one measurement and the low byte of the next.
+	// Well, as long as we read the index frequency in HIBYTE-LOBYTE order, at least.
+	wire DO_LATCH_INDEX_LOW;
+	Flag_Delay1tcy_OneCycle _fd1oc_ixhi_rd(CLK_MASTER, MCU_PMRD && (MCU_ADDR[7:0] == 8'h40),
+				DO_LATCH_INDEX_LOW);
+	always @(posedge CLK_MASTER) begin
+		if (DO_LATCH_INDEX_LOW) begin
+			INDEX_FREQ_LOW <= INDEX_FREQ_LAT[7:0];
+		end
+	end
+
+
+/////////////////////////////////////////////////////////////////////////////
 // Registers
 	reg	[7:0]		STEP_RATE;				// step rate in units of 500us
 	reg	[7:0]		DRIVE_CONTROL;			// Disc drive control register
@@ -526,6 +567,11 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h33:	MCU_PMD_OUT = 8'hAA;								// Fixed 0xAA register
 			8'h34:	MCU_PMD_OUT = clock_ticker;					// Clock ticker (20MHz)
 			8'h35:	MCU_PMD_OUT = clock_ticker_pll;				// Clock ticker (PLL)
+			8'h40:	begin													// Index frequency high-byte
+							MCU_PMD_OUT = INDEX_FREQ_LAT[15:8];
+							// INDEX_FREQ_LOW latched above
+						end
+			8'h41:	MCU_PMD_OUT = INDEX_FREQ_LOW;					// Index frequency low-byte
 			8'hE1:	MCU_PMD_OUT = HSIO_PORT;						// HSIO readback
 			default: MCU_PMD_OUT = 8'hXX;
 		endcase		
