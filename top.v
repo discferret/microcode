@@ -354,7 +354,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			end
 		end
 	end
-	
+
 	// Latch low byte of INDEX_FREQ_LAT when the high byte is read
 	// This stops us getting the high byte of one measurement and the low byte of the next.
 	// Well, as long as we read the index frequency in HIBYTE-LOBYTE order, at least.
@@ -365,6 +365,18 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		if (DO_LATCH_INDEX_LOW) begin
 			INDEX_FREQ_LOW <= INDEX_FREQ_LAT[7:0];
 		end
+	end
+
+	// New Index Frequency Measurement status bit. Cleared when INDEX_FREQ_HIGH is read,
+	// set when a new index measurement is available.
+	reg NEW_INDEX_MEASUREMENT;
+	always @(posedge CLK_MASTER) begin
+		if (~DO_LATCH_INDEX_LOW & INDEX_RISING_EDGE)
+			NEW_INDEX_MEASUREMENT <= 1'b1;
+		else if (DO_LATCH_INDEX_LOW & ~INDEX_RISING_EDGE)
+			NEW_INDEX_MEASUREMENT <= 1'b0;
+		else if (DO_LATCH_INDEX_LOW & INDEX_RISING_EDGE)
+			NEW_INDEX_MEASUREMENT <= 1'b0;
 	end
 
 
@@ -572,7 +584,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
 			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
 							// ACQUIRING is set active if the fifo is still draining.
-							{5'b0, ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING | (!FIFO_EMPTY)};
+							{4'b0, NEW_INDEX_MEASUREMENT,
+							ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING | (!FIFO_EMPTY)};
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
 							 FD_DENS_IN, SR_FDS_STEPPING, SR_R_EMPTY, SR_R_FULL};
