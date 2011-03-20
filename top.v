@@ -416,6 +416,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	wire ACQSTAT_ACQUIRING;					// Acquisition engine acquiring data
 	wire ACQSTAT_WRITING;					// Write engine is writing data
 
+	wire STATUS1_TRACK0_HIT;				// TRACK0 encountered during seek
+
 
 /////////////////////////////////////////////////////////////////////////////
 // Microcontroller interface
@@ -584,7 +586,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			8'h07:	MCU_PMD_OUT = MCO_VERSION[15:8];				// Microcode version high
 			8'h0E:	MCU_PMD_OUT =										// STATUS1 register
 							// ACQUIRING is set active if the fifo is still draining.
-							{4'b0, NEW_INDEX_MEASUREMENT,
+							{3'b0, STATUS1_TRACK0_HIT, NEW_INDEX_MEASUREMENT,
 							ACQSTAT_WRITING, ACQSTAT_WAITING, ACQSTAT_ACQUIRING | (!FIFO_EMPTY)};
 			8'h0F:	MCU_PMD_OUT =										// STATUS2 register
 							{FD_INDEX_IN, FD_TRACK0_IN, FD_WRPROT_IN, FD_RDY_DCHG_IN,
@@ -637,16 +639,17 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 	// The stepping controller itself
 	StepController stepper(
-		CLK_MASTER,
-		STEP_CLK,
-		1'b0,	/// TODO: connect to main reset
-		MCU_PMD,
-		(MCU_ADDR[7:0] == 8'hFF) && MCU_PMWR_sync,
-		SR_FDS_STEPPING,
-		FD_STEP,
-		FD_DIR,
-		FD_TRACK0_IN
-		);
+		.CLK				(CLK_MASTER),			// Master clock
+		.STEPCLK			(STEP_CLK),				// Step-rate clock enable
+		.RESET			(1'b0),					// Reset -- TODO: connect to main reset
+		.CTLBYTE			(MCU_PMD),				// Control byte; MSB=direction, rest=num of steps
+		.WRITE			((MCU_ADDR[7:0] == 8'hFF) && MCU_PMWR_sync),		// Write (+ve level triggered)
+		.IS_STEPPING	(SR_FDS_STEPPING),	// 1 = state machine is stepping the drive head
+		.STEP_OUT_n		(FD_STEP),				// Output to  FDD: step
+		.DIR_OUT			(FD_DIR),				// Output to  FDD: direction
+		.TRACK0_IN		(FD_TRACK0_IN),		// Input from FDD: track 0 (1=head has hit track 0)
+		.TRACK0_HIT		(STATUS1_TRACK0_HIT)	// Output status bit -- 1 = head reached track 0 during seek
+	);
 
 
 /////////////////////////////////////////////////////////////////////////////

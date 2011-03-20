@@ -7,7 +7,8 @@ module StepController(
 	IS_STEPPING,	// Output -- 1 if state machine is stepping
 	STEP_OUT_n,		// Output to FDD: step signal
 	DIR_OUT,			// Output to FDD: direction signal
-	TRACK0_IN		// Input from FDD: Track 0 state (1 = head over track 0)
+	TRACK0_IN,		// Input from FDD: Track 0 state (1 = head over track 0)
+	TRACK0_HIT		// Output status bit -- track 0 hit during seek
 );
 
 	input					CLK;
@@ -19,6 +20,7 @@ module StepController(
 	output				STEP_OUT_n;
 	output	reg		DIR_OUT;
 	input					TRACK0_IN;
+	output	reg		TRACK0_HIT;
 
 /////////////////////////////////////////////////////////////////////////////
 // Stepping output
@@ -53,7 +55,14 @@ module StepController(
 /////////////////////////////////////////////////////////////////////////////
 // Finite State Machine logic
 
+	// Set and Reset for track 0 sense state
+	reg TKSENSE_SET, TKSENSE_RST;
+
 	always @(posedge CLK) begin
+		// Don't set or clear the track0 sensor (yet)
+		TKSENSE_SET <= 1'b0;
+		TKSENSE_RST <= 1'b0;
+	
 		// Positive edge on clock
 		if (RESET == 1'b1) begin
 			// Reset active, set state to IDLE
@@ -80,10 +89,17 @@ module StepController(
 				S_STEP1:	begin
 								// STEP1 state. Entered after control word written.
 								// Waits for STEPCLK=1, then jumps to STEP2
-								if (STEPCLK == 1'b1) begin
-									cur_state <= S_STEP2;
+								if (TRACK0_IN && DIR_OUT) begin
+									// Seeking out and tk0 active; this is a track0 hit.
+									TKSENSE_SET <= 1'b1;
+									cur_state <= S_IDLE;
 								end else begin
-									cur_state <= S_STEP1;
+									TKSENSE_RST <= 1'b1;
+									if (STEPCLK == 1'b1) begin
+										cur_state <= S_STEP2;
+									end else begin
+										cur_state <= S_STEP1;
+									end
 								end
 							end
 				S_STEP2:	begin
@@ -101,25 +117,39 @@ module StepController(
 								// STEP3 state. Entered after STEPCLK=0.
 								// Waits for STEPCLK=1, then raises STEP, decrements NUM
 								// and jumps to STEP2 (if NUM>0) or IDLE (if NUM=0)
-								if (STEPCLK == 1'b1) begin
-									num_steps <= num_steps - 7'd1;
-									STEP_REG <= 1'b0;
-									// Track 0 guard -- refuse to step if the drive is
-									// at track 0 and direction = 1 (out)
-									// Keep looping until num_steps rolls over
-									if ((num_steps != 7'b000_0000) && (!(TRACK0_IN && DIR_OUT))) begin
-										cur_state <= S_STEP1;
-									end else begin
-										cur_state <= S_IDLE;
-									end
+								if (TRACK0_IN && DIR_OUT) begin
+									// Seeking out and tk0 active; this is a track0 hit.
+									TKSENSE_SET <= 1'b1;
+									cur_state <= S_IDLE;
 								end else begin
-									cur_state <= S_STEP3;
+									if (STEPCLK == 1'b1) begin
+										num_steps <= num_steps - 7'd1;
+										STEP_REG <= 1'b0;
+										// Track 0 guard -- refuse to step if the drive is
+										// at track 0 and direction = 1 (out)
+										// Keep looping until num_steps rolls over
+										if ((num_steps != 7'b000_0000) && (!(TRACK0_IN && DIR_OUT))) begin
+											cur_state <= S_STEP1;
+										end else begin
+											cur_state <= S_IDLE;
+										end
+									end else begin
+										cur_state <= S_STEP3;
+									end
 								end
 							end
 			endcase
 		end
 	end
 
+	always @(posedge CLK) begin
+		if (TKSENSE_SET) begin
+			TRACK0_HIT <= 1'b1;
+		end else if (TKSENSE_RST) begin
+			TRACK0_HIT <= 1'b0;
+		end
+	end
+	
 endmodule
 
 // vim: ts=3 sw=3
