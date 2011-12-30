@@ -18,9 +18,10 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index, start, running);
+module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark, index, start, running);
 	input							reset;		// state machine reset
 	input							clock;		// master state machine clock
+	input							clken;		// master state machine clock enable
 	input				[7:0]		mdat;			// memory data in
 	output	reg				maddr_inc;	// memory address increment
 	output	reg				wrdata;		// write data
@@ -60,130 +61,132 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 			maddr_inc <= 1'b0;
 			cur_instr <= 8'b0111_1111;		// STOP
 		end else begin
-			case (state)
-				ST_IDLE:	begin
-								// IDLE: State machine idle
+			if (clken) begin
+				case (state)
+					ST_IDLE:	begin
+									// IDLE: State machine idle
 
-								// Clear MADDR_INC (increment memory address -- set if MADDR incremented)
-								maddr_inc <= 1'b0;
-								// Terminate write data pulse
-								wrdat_r <= 1'b0;
-								wrgate <= 1'b1;
-								
-								// stay in current state unless START=1
-								if (start) begin
-									state <= ST_LOOP;
-								end else begin
-									state <= ST_IDLE;
+									// Clear MADDR_INC (increment memory address -- set if MADDR incremented)
+									maddr_inc <= 1'b0;
+									// Terminate write data pulse
+									wrdat_r <= 1'b0;
+									wrgate <= 1'b1;
+									
+									// stay in current state unless START=1
+									if (start) begin
+										state <= ST_LOOP;
+									end else begin
+										state <= ST_IDLE;
+									end
 								end
-							end
 
-				ST_LOOP: begin
-								// LOOP: Main state machine loop
-								
-								// Clear any active write-data pulses or memory increments
-								wrdat_r <= 1'b0;
-								maddr_inc <= 1'b0;
+					ST_LOOP: begin
+									// LOOP: Main state machine loop
+									
+									// Clear any active write-data pulses or memory increments
+									wrdat_r <= 1'b0;
+									maddr_inc <= 1'b0;
 
-								// Latch current instruction
-								cur_instr <= mdat;
-								
-								if (mdat[7] == 1'b1) begin
-									// 0b1nnn_nnnn: TIMER LOAD n
-									state <= ST_TIMER;
-								end else
-								if (mdat[7:6] == 2'b01) begin
-									// 0b01nn_nnnn: WAIT n INDEX PULSES
-									state <= ST_WAITIDX;
-								end else
-								if (mdat == 8'b0011_1111) begin
-									// 0b0011_1111: STOP
-									state <= ST_IDLE;
-								end else
-								if (mdat == 8'b0000_0011) begin
-									// 0b0000_0011: WAIT HSTMD
-									state <= ST_WAITHSTM;
-								end else
-								if (mdat == 8'b0000_0010) begin
-									// 0b0000_0010: WRITE PULSE
-									state <= ST_STROBE;
-								end else
-								if (mdat[7:1] == 7'b0000_000) begin
-									// 0b0000_000n: SET WRITE GATE
-									state <= ST_WRGATE;
-								end else begin
-									// nothing happens if we don't recognise the command...
-									state <= ST_LOOP;
+									// Latch current instruction
+									cur_instr <= mdat;
+									
+									if (mdat[7] == 1'b1) begin
+										// 0b1nnn_nnnn: TIMER LOAD n
+										state <= ST_TIMER;
+									end else
+									if (mdat[7:6] == 2'b01) begin
+										// 0b01nn_nnnn: WAIT n INDEX PULSES
+										state <= ST_WAITIDX;
+									end else
+									if (mdat == 8'b0011_1111) begin
+										// 0b0011_1111: STOP
+										state <= ST_IDLE;
+									end else
+									if (mdat == 8'b0000_0011) begin
+										// 0b0000_0011: WAIT HSTMD
+										state <= ST_WAITHSTM;
+									end else
+									if (mdat == 8'b0000_0010) begin
+										// 0b0000_0010: WRITE PULSE
+										state <= ST_STROBE;
+									end else
+									if (mdat[7:1] == 7'b0000_000) begin
+										// 0b0000_000n: SET WRITE GATE
+										state <= ST_WRGATE;
+									end else begin
+										// nothing happens if we don't recognise the command...
+										state <= ST_LOOP;
+									end
 								end
-							end
 
-				ST_TIMER: begin
-						// TIMER state 0: load the timer value
-						// Note that the logic below loads and decrements the counter
-						// Jump to "wait for timer to clear" state
-						state <= ST_TIMERWAIT;
-					end
-				
-				ST_TIMERWAIT: begin
-						// TIMER state 1:
-						// Wait for the timer to clear
-						if (timerreg == 0) begin
-							// Timer has hit zero. Increment the PC...
+					ST_TIMER: begin
+							// TIMER state 0: load the timer value
+							// Note that the logic below loads and decrements the counter
+							// Jump to "wait for timer to clear" state
+							state <= ST_TIMERWAIT;
+						end
+					
+					ST_TIMERWAIT: begin
+							// TIMER state 1:
+							// Wait for the timer to clear
+							if (timerreg == 0) begin
+								// Timer has hit zero. Increment the PC...
+								maddr_inc <= 1'b1;
+								// And go back to the LOOP state
+								state <= ST_LOOP;
+							end
+						end
+						
+					ST_STROBE: begin
+							// Send a write strobe
+							wrdat_r <= 1'b1;
 							maddr_inc <= 1'b1;
-							// And go back to the LOOP state
 							state <= ST_LOOP;
 						end
-					end
-					
-				ST_STROBE: begin
-						// Send a write strobe
-						wrdat_r <= 1'b1;
-						maddr_inc <= 1'b1;
-						state <= ST_LOOP;
-					end
 
-				ST_WRGATE: begin
-						// SET WRITE GATE						
-						// Load write gate, increment PC and jump back to INIT state
-						wrgate <= ~cur_instr[0];
-						maddr_inc <= 1'b1;
-						state <= ST_LOOP;
-					end
-				
-				ST_WAITIDX: begin
-						// WAIT FOR N INDEX PULSES state 0
-						// Note that the load logic for the counter is located below, outside of the state machine
-						state <= ST_INDEXWAIT;
-					end
-					
-				ST_INDEXWAIT: begin
-						// WAIT FOR N INDEX PULSES state 1
-						// Wait for the index counter to clear
-						if (indexcounter == 0) begin
-							// Counter has cleared.
-							// Increment the PC...
-							maddr_inc <= 1;
-							// And go back to the LOOP state
+					ST_WRGATE: begin
+							// SET WRITE GATE						
+							// Load write gate, increment PC and jump back to INIT state
+							wrgate <= ~cur_instr[0];
+							maddr_inc <= 1'b1;
 							state <= ST_LOOP;
 						end
-						// Else we just keep spinning here until the counter decrements
-					end
-				
-				ST_WAITHSTM: begin
-						// WAIT HARD SECTOR TRACK MARKER
-						if (trkmark) begin
-							maddr_inc <= 1;
+					
+					ST_WAITIDX: begin
+							// WAIT FOR N INDEX PULSES state 0
+							// Note that the load logic for the counter is located below, outside of the state machine
+							state <= ST_INDEXWAIT;
+						end
+						
+					ST_INDEXWAIT: begin
+							// WAIT FOR N INDEX PULSES state 1
+							// Wait for the index counter to clear
+							if (indexcounter == 0) begin
+								// Counter has cleared.
+								// Increment the PC...
+								maddr_inc <= 1;
+								// And go back to the LOOP state
+								state <= ST_LOOP;
+							end
+							// Else we just keep spinning here until the counter decrements
+						end
+					
+					ST_WAITHSTM: begin
+							// WAIT HARD SECTOR TRACK MARKER
+							if (trkmark) begin
+								maddr_inc <= 1;
+								state <= ST_IDLE;
+							end else begin
+								state <= ST_WAITHSTM;
+							end
+						end
+
+					default: begin
+							// Fallback state
 							state <= ST_IDLE;
-						end else begin
-							state <= ST_WAITHSTM;
 						end
-					end
-
-				default: begin
-						// Fallback state
-						state <= ST_IDLE;
-					end
-			endcase
+				endcase
+			end
 		end
 	end
 
@@ -196,13 +199,15 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 		if (reset) begin
 			// reset timer to zero
 			timerreg <= 7'd0;
-		end else if (state == ST_TIMER) begin
-			// load timer from lowest 7 bits of current instruction
-			timerreg <= cur_instr[6:0];
-		end else begin
-			// decrement timer register, unless it's already zero
-			if (timerreg > 7'd0) begin
-				timerreg <= timerreg - 7'd1;
+		end else if (clken) begin
+			if (state == ST_TIMER) begin
+				// load timer from lowest 7 bits of current instruction
+				timerreg <= cur_instr[6:0];
+			end else begin
+				// decrement timer register, unless it's already zero
+				if (timerreg > 7'd0) begin
+					timerreg <= timerreg - 7'd1;
+				end
 			end
 		end
 	end
@@ -214,8 +219,10 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 			// reset: clear index detector
 			indexdetect <= 2'b00;
 		end else begin
-			// shift in index bit
-			indexdetect <= {indexdetect[0], index};
+			if (clken) begin
+				// shift in index bit
+				indexdetect <= {indexdetect[0], index};
+			end
 		end
 	end
 	
@@ -225,14 +232,16 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 		if (reset) begin
 			// reset index counter to zero
 			indexcounter <= 6'd0;
-		end else if (state == ST_WAITIDX) begin
-			// load counter from lowest 6 bits of current instruction byte
-			indexcounter <= cur_instr[5:0];
-		end else begin
-			// when an index pulse occurs, decrement the counter
-			// unless it's already =0, in which case, hold at zero.
-			if ((indexdetect == 2'b01) && (indexcounter > 6'd0)) begin
-				indexcounter <= indexcounter - 6'd1;
+		end else if (clken) begin
+			if (state == ST_WAITIDX) begin
+				// load counter from lowest 6 bits of current instruction byte
+				indexcounter <= cur_instr[5:0];
+			end else begin
+				// when an index pulse occurs, decrement the counter
+				// unless it's already =0, in which case, hold at zero.
+				if ((indexdetect == 2'b01) && (indexcounter > 6'd0)) begin
+					indexcounter <= indexcounter - 6'd1;
+				end
 			end
 		end
 	end
@@ -243,15 +252,17 @@ module DiscWriter(reset, clock, mdat, maddr_inc, wrdata, wrgate, trkmark, index,
 		if (reset) begin
 			writetimer <= 1'b0;
 			wrdata <= 1'b1;
-		end else if (wrdat_r == 1'b1) begin
-			writetimer <= 8'd60;
-			wrdata <= 1'b0;
-		end else if (writetimer > 1'b0) begin
-			writetimer <= writetimer - 1'b1;
-			wrdata <= 1'b0;
-		end else begin
-			writetimer <= 1'b0;
-			wrdata <= 1'b1;
+		end else if (clken) begin
+			if (wrdat_r == 1'b1) begin
+				writetimer <= 8'd60;
+				wrdata <= 1'b0;
+			end else if (writetimer > 1'b0) begin
+				writetimer <= writetimer - 1'b1;
+				wrdata <= 1'b0;
+			end else begin
+				writetimer <= 1'b0;
+				wrdata <= 1'b1;
+			end
 		end
 	end
 

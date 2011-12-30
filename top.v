@@ -123,6 +123,18 @@ module top(
 	// Index frequency reference clock
 	wire CKE_INDEXFREQ	=	(index_clk_counter == 16'd0);
 
+	// Clock divider and mux to produce 100MHz, 50MHz and 25MHz clock enables for the acquisition units
+	reg [2:0] AcquisitionClkDiv;
+	always @(posedge CLK_MASTER) AcquisitionClkDiv <= AcquisitionClkDiv + 3'd1;
+	reg CLKEN_ACQUISITION;
+	always @(ACQ_CLKSEL or AcquisitionClkDiv or CLK_MASTER) begin
+		case (ACQ_CLKSEL)
+			2'b00:	CLKEN_ACQUISITION = 1'b1;						// Bypass		(100MHz)
+			2'b01:	CLKEN_ACQUISITION = AcquisitionClkDiv[0];	// Divide by 2	(50MHz)
+			2'b10:	CLKEN_ACQUISITION = AcquisitionClkDiv[1];	// Divide by 4 (25MHz)
+			default:	CLKEN_ACQUISITION = AcquisitionClkDiv[2];	// Divide by 8	(12.5MHz)
+		endcase
+	end
 	
 /////////////////////////////////////////////////////////////////////////////
 // Clock counter
@@ -387,6 +399,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 	reg	[1:0]		MFM_CLKSEL;				// MFM decoder clock select (for syncword detectors)
 
+	reg	[1:0]		ACQ_CLKSEL;				// Acquisition clock select (for reader and writer engines)
+	
 	reg	[7:0]		ACQ_START_MASK;		// Acquisition start mode
 	reg	[7:0]		ACQ_STOP_MASK;			// Acquisition stop mode
 	reg	[7:0]		ACQ_START_NUM;			// Number of start events before acq starts
@@ -542,7 +556,9 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						MFM_MASK_STOP[15:8] <= MCU_PMD;
 					 end
 
- 			8'h2F: begin			// MFM_CLKSEL -- MFM Clock Select
+ 			8'h2F: begin			// CLKSEL -- Clock Select
+						// Bits 5,4: Acquisition Clock Select bits
+						ACQ_CLKSEL <= MCU_PMD[5:4];
 						// Bits 1,0: MFM clock select bits
 						MFM_CLKSEL <= MCU_PMD[1:0];
 					 end
@@ -701,6 +717,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	// Data Acquisition Module
 	DiscReader _discreader(
 		.CLOCK					(CLK_MASTER),
+		.CLKEN					(CLKEN_ACQUISITION),
 		.RUN						(ACQSTAT_ACQUIRING),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.FD_INDEX_IN			(FD_INDEX_IN),
@@ -724,6 +741,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	DiscWriter _discwriter(
 		.reset					(ACQCON_ABORT_sync),
 		.clock					(CLK_MASTER),
+		.clken					(CLKEN_ACQUISITION),
 		.mdat						(SRAM_DQ),
 		.maddr_inc				(SRA_INCREMENT_DWC),
 		.wrdata					(FD_WRDATA),

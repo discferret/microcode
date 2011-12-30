@@ -19,8 +19,9 @@
  *       path?
  */
 
-module DiscReader(CLOCK, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
+module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
 	input					CLOCK;				// counter clock
+	input					CLKEN;				// counter clock enable
 	input					RUN;					// enable input -- 1 to acquire
 	input					FD_RDDATA_IN;		// read data
 	input					FD_INDEX_IN;		// index pulse
@@ -45,13 +46,16 @@ module DiscReader(CLOCK, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
 			// reset -- clear the counter's internal state
 			timer <= 7'd1;
 		end else begin
-			// clock pulse -- increment the timer
-			if (timer == 7'b111_1111) begin
-				// timer overflow
-				timer <= 7'd1;
-			end else begin
-				// increment normally
-				timer <= timer + 7'd1;
+			// clock pulses must be qualified by a clock enable
+			if (CLKEN) begin
+				// clock pulse -- increment the timer
+				if (timer == 7'b111_1111) begin
+					// timer overflow
+					timer <= 7'd1;
+				end else begin
+					// increment normally
+					timer <= timer + 7'd1;
+				end
 			end
 		end
 	end
