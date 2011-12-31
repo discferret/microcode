@@ -86,20 +86,16 @@ module AcquisitionControl(
 	always @(posedge MFM_clocks_low) MFM_CLKSEL_latched <= ACQCON_MFM_CLKSEL;
 */
 	// Select the relevant clock
-	reg DATASEP_CLK_pre;
+	reg DATASEP_CLKEN;
 	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_DATASEP) begin
 		case (DATASEP_CLKSEL)
-			2'b00:	DATASEP_CLK_pre = CLK_DATASEP;			// 1Mbps		(F/1 clk)
-			2'b01:	DATASEP_CLK_pre = DatasepClkDiv[0];		// 500kbps	(F/2 clk)
-			2'b10:	DATASEP_CLK_pre = DatasepClkDiv[1];		// 250kbps	(F/4 clk)
-			default:	DATASEP_CLK_pre = DatasepClkDiv[2];		// 125kbps	(F/8 clk)
+			2'b00:	DATASEP_CLKEN = 1'b1;					// 1Mbps		(F/1 clk)
+			2'b01:	DATASEP_CLKEN = DatasepClkDiv[0];	// 500kbps	(F/2 clk)
+			2'b10:	DATASEP_CLKEN = DatasepClkDiv[1];	// 250kbps	(F/4 clk)
+			default:	DATASEP_CLKEN = DatasepClkDiv[2];	// 125kbps	(F/8 clk)
 		endcase
 	end
 	
-	// Sync clock against master clock to remove glitches
-	reg DATASEP_MASTER_CLK;
-	always @(posedge CLK_DATASEP) DATASEP_MASTER_CLK <= DATASEP_CLK_pre;
-
 
 /////////////////////////////////////////////////////////////////////////////
 // Sync-word detectors
@@ -111,7 +107,7 @@ module AcquisitionControl(
 	defparam _mfm_syncdet_start.PJL_COUNTER_MAX = PJL_COUNTER_MAX;
 	MFMSyncWordDetector _mfm_syncdet_start(
 		.CLK_DATASEP			(CLK_DATASEP),
-		.CLK_DATASEP_DIVIDED	(DATASEP_MASTER_CLK),
+		.CLKEN_DATASEP			(DATASEP_CLKEN),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(MFM_SYNCWORD_START),
 		.MASK_IN					(MFM_MASK_START),
@@ -121,7 +117,7 @@ module AcquisitionControl(
 	defparam _mfm_syncdet_stop.PJL_COUNTER_MAX = PJL_COUNTER_MAX;
 	MFMSyncWordDetector _mfm_syncdet_stop(
 		.CLK_DATASEP			(CLK_DATASEP),
-		.CLK_DATASEP_DIVIDED	(DATASEP_MASTER_CLK),
+		.CLKEN_DATASEP			(DATASEP_CLKEN),
 		.FD_RDDATA_IN			(FD_RDDATA_IN),
 		.SYNC_WORD_IN			(MFM_SYNCWORD_STOP),
 		.MASK_IN					(MFM_MASK_STOP),
