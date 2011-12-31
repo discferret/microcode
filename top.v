@@ -66,7 +66,7 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
 	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h0024;		// Microcode version
+	localparam	MCO_VERSION	= 16'h0025;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -476,11 +476,11 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						// Note: other logic for this state below.
 					 end
 
-				8'h03: begin			// SRAM_DATA
-							// Note: handled by Memory Write Controller (above)
+			8'h03: begin			// SRAM_DATA
+						// Note: handled by Memory Write Controller (above)
 					 end
 
-				8'h04: begin			// DRIVE_CONTROL
+			8'h04: begin			// DRIVE_CONTROL
 						DRIVE_CONTROL[7:0] <= MCU_PMD;
 					 end
 
@@ -507,6 +507,11 @@ localparam STATUSLED_BLINK_ONLY = 0;
 
 			8'h09: begin			// ACQ_STOP_NUM
 						ACQ_STOP_NUM <= MCU_PMD;
+					 end
+					 
+			8'h0A: begin			// ACQ_CLKSEL -- Acquisition clock rate
+						// Bits 1,0: Acquisition Clock Select bits
+						ACQ_CLKSEL <= MCU_PMD[1:0];
 					 end
 
 			8'h10: begin			// HSTMD_THR_START
@@ -556,9 +561,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						MFM_MASK_STOP[15:8] <= MCU_PMD;
 					 end
 
- 			8'h2F: begin			// CLKSEL -- Clock Select
-						// Bits 5,4: Acquisition Clock Select bits
-						ACQ_CLKSEL <= MCU_PMD[5:4];
+ 			8'h2F: begin			// MFM_CLKSEL -- MFM sync word detector clock select
 						// Bits 1,0: MFM clock select bits
 						MFM_CLKSEL <= MCU_PMD[1:0];
 					 end
