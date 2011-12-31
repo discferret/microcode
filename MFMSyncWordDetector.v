@@ -16,7 +16,7 @@ module MFMSyncWordDetector(
 
 	// Max counter value for PJL data separator.
 	// 16 for 32-clock (16MHz=500kbps), 20 for 40-clock (20MHz=500kbps)
-	parameter PJL_COUNTER_MAX = 8'd16;
+	parameter PJL_COUNTER_MAX = 8'd20;
 
 /////////////////////////////////////////////////////////////////////////////
 // MFM sync word detector
