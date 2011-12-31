@@ -123,19 +123,24 @@ module top(
 	// Index frequency reference clock
 	wire CKE_INDEXFREQ	=	(index_clk_counter == 16'd0);
 
-	// Clock divider and mux to produce 100MHz, 50MHz and 25MHz clock enables for the acquisition units
-	reg [2:0] AcquisitionClkDiv;
-	always @(posedge CLK_MASTER) AcquisitionClkDiv <= AcquisitionClkDiv + 3'd1;
-	reg CLKEN_ACQUISITION;
-	always @(ACQ_CLKSEL or AcquisitionClkDiv or CLK_MASTER) begin
-		case (ACQ_CLKSEL)
-			2'b00:	CLKEN_ACQUISITION = 1'b1;						// Bypass		(100MHz)
-			2'b01:	CLKEN_ACQUISITION = AcquisitionClkDiv[0];	// Divide by 2	(50MHz)
-			2'b10:	CLKEN_ACQUISITION = AcquisitionClkDiv[1];	// Divide by 4 (25MHz)
-			default:	CLKEN_ACQUISITION = AcquisitionClkDiv[2];	// Divide by 8	(12.5MHz)
-		endcase
+	//// Clock divider and mux to produce clock enables for the acquisition units
+	// First generate the one-in-two, one-in-four and one-in-eight signals
+	reg AcqClkCounter_Half;
+	reg [1:0] AcqClkCounter_Quarter;
+	reg [2:0] AcqClkCounter_Eighth;
+	always @(posedge CLK_MASTER) begin
+		AcqClkCounter_Half    <= AcqClkCounter_Half    + 1'd1;
+		AcqClkCounter_Quarter <= AcqClkCounter_Quarter + 2'd1;
+		AcqClkCounter_Eighth  <= AcqClkCounter_Eighth  + 3'd1;
 	end
 	
+	// Mux to select the desired CKE signal
+	wire CLKEN_ACQUISITION =
+		(ACQ_CLKSEL == 2'b01) ?	(AcqClkCounter_Half		== 1'b0) :	// Half clock rate		50MHz
+		(ACQ_CLKSEL == 2'b10) ?	(AcqClkCounter_Quarter	== 2'b0) :	// Quarter clock rate	25MHz
+		(ACQ_CLKSEL == 2'b11) ?	(AcqClkCounter_Eighth	== 3'b0) :	// Eighth clock rate		12.5MHz
+		1'b1;																			// No clock division		100MHz
+
 /////////////////////////////////////////////////////////////////////////////
 // Clock counter
 

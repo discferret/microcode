@@ -79,24 +79,24 @@ module AcquisitionControl(
 	reg [2:0] DatasepClkDiv;
 	always @(posedge CLK_DATASEP) DatasepClkDiv <= DatasepClkDiv + 3'd1;
 
-	// Clock multiplexer
-/*	// Latch clock-select only when all clocks are low
-	wire MFM_clocks_low = (!CLK_PLL16MHZ) & (!CLK_PLL8MHZ) & (!CLK_PLL4MHZ);
-	reg [1:0] MFM_CLKSEL_latched;
-	always @(posedge MFM_clocks_low) MFM_CLKSEL_latched <= ACQCON_MFM_CLKSEL;
-*/
-	// Select the relevant clock
-	reg DATASEP_CLKEN;
-	always @(DATASEP_CLKSEL or DatasepClkDiv or CLK_DATASEP) begin
-		case (DATASEP_CLKSEL)
-			2'b00:	DATASEP_CLKEN = 1'b1;					// 1Mbps		(F/1 clk)
-			2'b01:	DATASEP_CLKEN = DatasepClkDiv[0];	// 500kbps	(F/2 clk)
-			2'b10:	DATASEP_CLKEN = DatasepClkDiv[1];	// 250kbps	(F/4 clk)
-			default:	DATASEP_CLKEN = DatasepClkDiv[2];	// 125kbps	(F/8 clk)
-		endcase
+	//// Clock divider and mux to produce clock enables for the data separators
+	// First generate the one-in-two, one-in-four and one-in-eight signals
+	reg DatasepClkCounter_Half;
+	reg [1:0] DatasepClkCounter_Quarter;
+	reg [2:0] DatasepClkCounter_Eighth;
+	always @(posedge CLK_DATASEP) begin
+		DatasepClkCounter_Half    <= DatasepClkCounter_Half    + 1'd1;
+		DatasepClkCounter_Quarter <= DatasepClkCounter_Quarter + 2'd1;
+		DatasepClkCounter_Eighth  <= DatasepClkCounter_Eighth  + 3'd1;
 	end
 	
-
+	// Mux to select the desired CKE signal
+	wire DATASEP_CLKEN =
+		(DATASEP_CLKSEL == 2'b01) ?	(DatasepClkCounter_Half		== 1'b0) :	// Half clock rate		500kbps	(PC 1.44MB)
+		(DATASEP_CLKSEL == 2'b10) ?	(DatasepClkCounter_Quarter	== 2'b0) :	// Quarter clock rate	250kbps	(PC 720K)
+		(DATASEP_CLKSEL == 2'b11) ?	(DatasepClkCounter_Eighth	== 3'b0) :	// Eighth clock rate		125kbps	(Unknown)
+		1'b1;																						// No clock division		1Mbps		(PC 2.88MB)
+	
 /////////////////////////////////////////////////////////////////////////////
 // Sync-word detectors
 
