@@ -17,36 +17,48 @@ module DataSeparator(MASTER_CLK, CLKEN, FD_RDDATA_IN, SHAPED_DATA, DWIN);
 // Verilog implementation by Phil Pemberton
 // Core rewritten 2010-01-29 to get more flexibility for clocking
 // Rewritten from scratch 2011-12-31 to fix all the timing violations.
-//   Winners don't use asynchronous logic in FPGAs.....
+//   Winners don't use asynchronous logic in FPGAs...
+//
+// This is a total rewrite, with a completely different synchroniser-decoder
+// arrangement, and is far more suited to FPGA implementation. Everything is
+// implemented in a single clock domain, and there's only one asynchronous
+// reset (which is generated from MASTER_CLK anyway).
+//
+// Basically, we have a counter and an input signal source. When the counter
+// hits max-count, we reset it to zero. When it hits the half-way point, we
+// flip DATA_WINDOW (although in this implementation DWIN is a pulse output,
+// not a toggle). If the input signal goes high, we clear the counter.
+//
+// This leaves us with a fairly primitive digital phase-locked loop.
 
 	//// Input synchronisation (The Synchrotron)
 	// This takes a pulse of arbitrary width from the floppy drive, and
 	// converts it to a one clock wide negative pulse (U2B) and a two clock
 	// wide negative pulse (SHAPED_DATA)
 	reg [2:0] syncroniser_r;
-	wire u2b = !(syncroniser_r == 3'bX01);
-	assign SHAPED_DATA = !((syncroniser_r == 3'bX01) || (syncroniser_r == 3'b011));
-	always @(negedge MASTER_CLK) begin
-		if (CLKEN) begin
+	always @(posedge MASTER_CLK) begin
 			syncroniser_r <= {syncroniser_r[1:0], FD_RDDATA_IN};
-		end
 	end
+
+	wire u2b = (!syncroniser_r[1] && syncroniser_r[0]);
+	assign SHAPED_DATA = (!syncroniser_r[2] && syncroniser_r[1] && syncroniser_r[0]) || u2b;
 
 	//// PJL counter
 	reg [7:0] pjl_counter;
 	reg DWIN;
-	always @(posedge MASTER_CLK or negedge u2b) begin
-		if (!u2b) begin
+	always @(posedge MASTER_CLK or posedge u2b) begin
+		if (u2b) begin
 			// Asynchronous clear
 			pjl_counter <= 8'd0;
 		end else begin
+			DWIN <= 1'b0;
 			if (CLKEN) begin
 				// Increment PJL counter
 				pjl_counter <= pjl_counter + 8'd1;
 
 				if (pjl_counter == (PJL_COUNTER_MAX / 8'd2)) begin
-					// Hit half-way point. Flip data window.
-					DWIN <= ~DWIN;
+					// Hit half-way point. Flag a data window.
+					DWIN <= 1'b1;
 				end else if (pjl_counter == PJL_COUNTER_MAX) begin
 					// Hit max count. Reset counter.
 					pjl_counter <= 8'd0;
