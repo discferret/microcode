@@ -63,7 +63,7 @@ reg[BITS:0] trap;
 		end
 
 		if (!RESET && RUN) begin
-			if (counter_overflow && !(FD_RDDATA_IN_tcysync | FD_INDEX_IN_tcysync)) begin
+			if ((counter_overflow && CLKEN) && !(FD_RDDATA_IN_tcysync | FD_INDEX_IN_tcysync)) begin
 				// Counter overflow, but RD_DATA and INDEX are inactive. Write an
 				// overflow byte.
 				DATA <= ('d1 << BITS-1) - 'd1;
