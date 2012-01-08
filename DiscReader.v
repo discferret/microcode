@@ -34,8 +34,6 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 /////////////////////////////////////////////////////////////////////////////
 // Frequency counter
 
-reg[BITS:0] trap;
-
 	// current counter value
 	reg [BITS-2:0] counter;
 	// has the counter overflowed?
