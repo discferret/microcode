@@ -73,8 +73,8 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 				WRITE <= 1'b1;
 
 				// Set index and data state bits
-				DATA[BITS-1] <= FD_INDEX_IN_tcysync;
-				DATA[BITS-2] <= FD_RDDATA_IN_tcysync;
+				DATA[BITS-2] <= FD_INDEX_IN_tcysync;
+				DATA[BITS-1] <= FD_RDDATA_IN_tcysync;
 
 				// Reset the counter
 				counter <= 'd0;
