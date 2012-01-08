@@ -1,13 +1,10 @@
 To-do list for the DiscFerret microcode:
+  - Improve data compression in the DiscReader engine
+  - Timing model for the DiscWriter engine
+  - Proper documentation
+  - Testbenches for DiscReader and DiscWriter
 
--- DFE-3 stream format (disc reader)
-    * 16 bit word length
-       * 14 bit counter
-       * 2 bit flag word
-         00   Carry (counter must have all bits set to 1)
-         01   Index pulse caused store
-         10   Data pulse caused store
-         11   Index and data pulse occurred at the same time
-
-    This will involve extending the size of the FIFO to 16 bits, then changing the DiscReader to handle this. Finally the RAM write logic must be altered to allow 8bit writes from the PIC, and 16bit ones from the FIFO. Will probably need a proper state-machine arbiter for this.
+Things implemented on branches:
+  - 16-bit disc reader -- this is on the 16BIT_DISCREADER branch but has issues.
+    When sampling at 100MHz, it generally reduces the amount of data stored. At 50MHz or 25MHz, it *increases* it by a significant amount. See Mantis bug #3 for more information on this.
 
