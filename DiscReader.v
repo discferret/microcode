@@ -12,7 +12,9 @@
  */
 
 module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
-	parameter					BITS		= 16;		// data bits
+	parameter					BITS		= 16;		// number of data bits
+															// counter will have two less bits
+															// (there are two flag bits)
 
 	input							CLOCK;				// counter clock
 	input							CLKEN;				// counter clock enable
@@ -35,17 +37,14 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 // Frequency counter
 
 	// current counter value
-	reg [BITS-2:0] counter;
+	reg [BITS-3:0] counter;
 	// has the counter overflowed?
-	wire counter_overflow = (counter == ('d1 << BITS-1) - 'd2);
+	wire counter_overflow = (counter == ('d1 << BITS-2) - 'd2);
 	// state of INDEX in the previous clock cycle
-	reg last_index_state;
 
 	always @(posedge CLOCK) begin
 		// clear write flag if it is set
 		WRITE <= 1'b0;
-		// save index state from this cycle
-		last_index_state <= FD_INDEX_IN_tcysync;
 
 		// -- frequency counter --
 		if (RESET || !RUN) begin
@@ -53,7 +52,7 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 			counter <= 'd0;
 		end else if (CLKEN) begin
 			// otherwise increment
-			if (counter < ('d1 << BITS-1) - 'd2) begin
+			if (counter < ('d1 << BITS-2) - 'd2) begin
 				counter <= counter + 'd1;
 			end else begin
 				counter <= 'd0;
@@ -64,16 +63,18 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 			if ((counter_overflow && CLKEN) && !(FD_RDDATA_IN_tcysync | FD_INDEX_IN_tcysync)) begin
 				// Counter overflow, but RD_DATA and INDEX are inactive. Write an
 				// overflow byte.
-				DATA <= ('d1 << BITS-1) - 'd1;
+				DATA[BITS-3:0] <= ('d1 << BITS-2) - 'd1;
+				DATA[BITS-1:BITS-2] <= 2'b0;	// overflow
 				WRITE <= 'd1;
 			end else if (FD_RDDATA_IN_tcysync | FD_INDEX_IN_tcysync) begin
 				// No overflow, either RDDATA or INDEX is active.
 				// Write current counter value
-				DATA[BITS-2:0] <= counter;
+				DATA[BITS-3:0] <= counter;
 				WRITE <= 1'b1;
 
-				// Set index state bit
-				DATA[BITS-1] <= (last_index_state | FD_INDEX_IN_tcysync);
+				// Set index and data state bits
+				DATA[BITS-1] <= FD_INDEX_IN_tcysync;
+				DATA[BITS-2] <= FD_RDDATA_IN_tcysync;
 
 				// Reset the counter
 				counter <= 'd0;
