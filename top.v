@@ -307,6 +307,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 			MWC_S_FIFO_OEIA:				begin
 								// FIFO_OEIA: Make OE inactive and load data from the FIFO
 								SRAM_OE_n_r			<= 1'b1;
+								FIFO_RD				<= 1'b0;
 								MWC_CUR_STATE		<= MWC_S_FIFO_WRITE_HI;
 							end
 							
@@ -332,6 +333,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 								// FIFO_WRITE_LO: Write low byte
 								FIFO_QHALF			<=	FIFO_Q[7:0];
 								SRAM_WE_n_r			<= 1'b0;
+								SRA_INCREMENT_MWC	<= 1'b0;
 								MWC_CUR_STATE		<=	MWC_S_FIFO_WRITE_LO_END;
 							end
 							
