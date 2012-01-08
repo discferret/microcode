@@ -12,7 +12,7 @@
  */
 
 module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRITE);
-	parameter					BITS		= 8;		// data bits
+	parameter					BITS		= 16;		// data bits
 
 	input							CLOCK;				// counter clock
 	input							CLKEN;				// counter clock enable
