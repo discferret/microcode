@@ -207,7 +207,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	wire			DAM_SRAM_WR;
 
 // Data out from the Acquisition (DiscReader) module
-	wire[15:0]	DAM_SRAM_WRITE_BUS;
+	wire[7:0]	DAM_SRAM_WRITE_BUS;
 
 // Data bus from the MCU Interface
 	reg[7:0]		PMD_LATCHED;
@@ -215,35 +215,27 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		PMD_LATCHED <= MCU_PMD;
 	end
 
-
 // SRAM data bus is driven by us if OE is inactive, else it's Hi-Z
-// It's driven by the FIFO if SRAM_DQ_MUX=1, otherwise it's driven by the PMD
-	reg			SRAM_DQ_MUX;
-	parameter	SRAM_DQ_MUX_FIFO	= 1'b1;
-	parameter	SRAM_DQ_MUX_PIC	= 1'b0;
-	reg[7:0]		FIFO_QHALF;
-	assign		SRAM_DQ		= SRAM_OE_n ? (SRAM_DQ_MUX ? FIFO_QHALF : PMD_LATCHED) : 8'hzz;
+	wire[7:0]	FIFO_Q;
+	assign		SRAM_DQ		= SRAM_OE_n ? /*SRAM_DQ_WR*/ FIFO_Q : 8'hzz;
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Memory write controller
 
-	// TODO: FIFO Full should cause an acquisition abort.
-	wire	FIFO_EMPTY, FIFO_FULL;
-	wire [15:0] FIFO_Q;
-	reg	FIFO_RD;
-	
-	ramfifo _ramfifo (
-		.clock		(CLK_MASTER),				// Synchronous clock	--> 100MHz master osc
-		.data			(DAM_SRAM_WRITE_BUS),	// FIFO input data	--> Disc Reader DATA_OUT
-		.wrreq		(DAM_SRAM_WR),				// FIFO Write			--> Disc Reader WRITE line
-		.q				(FIFO_Q),					// FIFO output data	--> FIFO_Q
-		.rdreq		(FIFO_RD),					// FIFO Read			--> FIFO_RD
-		.empty		(FIFO_EMPTY),				// FIFO empty flag
-		.full			(FIFO_FULL),				// FIFO full flag
-		.sclr			(ACQCON_ABORT_sync)		// Synchronous clear	--> ACQCON.ABORT bit (synchronised to CLK_MASTER)
+	// TODO: FIFO Full should cause an acquisition abort
+	wire FIFO_EMPTY, FIFO_FULL;
+	ramfifo _ramfifo(
+		.clock		(CLK_MASTER),
+		// Bus arbitration: DAM has the write bus when ACQSTAT_WAITING or ACQSTAT_ACQUIRING
+		.data			(((ACQSTAT_WAITING) || (ACQSTAT_ACQUIRING)) ? DAM_SRAM_WRITE_BUS : PMD_LATCHED),
+		.rdreq		(MWC_CUR_STATE == MWC_S_OEIA),
+		.sclr			(ACQCON_ABORT_sync),
+		.wrreq		(MWC_WRITE_SRAM_DATA || DAM_SRAM_WR),
+		.empty		(FIFO_EMPTY),
+		.full			(FIFO_FULL),
+		.q				(FIFO_Q)
 	);
-
 
 	// SRAM write/output enable
 	reg SRAM_WE_n_r, SRAM_OE_n_r;
@@ -253,125 +245,58 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	// SRAM address increment
 	reg SRA_INCREMENT_MWC;
 
-	// SRAM Write command bit from register address decoder (see below)
+	// Current MWC state
+	reg [2:0] MWC_CUR_STATE;
+	
+	// Valid MWC states
+	parameter MWC_S_IDLE			= 3'h0;		// Idle (waiting for write)
+	parameter MWC_S_OEIA			= 3'h1;		// OE Inactive (disable SRAM outputs)
+	parameter MWC_S_WRITE		= 3'h2;		// Writing to RAM
+	parameter MWC_S_INCADDR		= 3'h3;		// End write and increment address
+	parameter MWC_S_WRITEEND	= 3'h4;
+
+	// SRAM Write command bit from register address decoder (below)
 	wire MWC_WRITE_SRAM_DATA, MWC_WRITE_SRAM_DATA_pre;
 	Flag_Delay1tcy_OneCycle _fd1oc_ramwr_sync(CLK_MASTER, MCU_PMWR_sync && (MCU_ADDR[7:0] == 8'h03), MWC_WRITE_SRAM_DATA);
-	
-	// Current MWC state
-	reg [3:0] MWC_CUR_STATE;
-
-	// Valid MWC states
-	parameter MWC_S_IDLE						= 4'h0;		// Idle (waiting for write)
-	parameter MWC_S_PIC_OEIA				= 4'h1;		// OE Inactive (disable SRAM outputs)
-	parameter MWC_S_PIC_WRITE				= 4'h2;		// Writing to RAM
-	parameter MWC_S_PIC_WRITE_END			= 4'h3;		// End of write from PIC
-	parameter MWC_S_PIC_INCR				= 4'h4;		// Increment address
-	
-	parameter MWC_S_FIFO_OEIA				= 4'h5;		// FIFO -- OE inactive
-	parameter MWC_S_FIFO_WRITE_HI			= 4'h6;		// FIFO -- Write high byte
-	parameter MWC_S_FIFO_WRITE_HI_END	= 4'h7;		// FIFO -- Hibyte write end
-	parameter MWC_S_FIFO_INCR_HI			= 4'h8;		// FIFO -- Hibyte address increment
-	parameter MWC_S_FIFO_WRITE_LO			= 4'h9;		// FIFO -- Write low byte
-	parameter MWC_S_FIFO_WRITE_LO_END	= 4'hA;		// FIFO -- Lobyte write end
-	parameter MWC_S_FIFO_INCR_LO			= 4'hB;		// FIFO -- Lobyte address increment
 
 	// MWC State machine
 	always @(posedge CLK_MASTER) begin
-		// clear FIFO Read Request
-		FIFO_RD <= 1'b0;
-		
-		// -- state table --
 		case (MWC_CUR_STATE)
-			MWC_S_IDLE:				begin
+			MWC_S_IDLE:		begin
 								// S_IDLE: Idle state. Write bit inactive, OE active.
 								SRAM_WE_n_r			<= 1'b1;
 								SRAM_OE_n_r			<= 1'b0;
 								SRA_INCREMENT_MWC	<= 1'b0;
 
 								if (!FIFO_EMPTY) begin
-									// Write from FIFO
-									MWC_CUR_STATE	<= MWC_S_FIFO_OEIA;
-									SRAM_DQ_MUX		<= SRAM_DQ_MUX_FIFO;
-									FIFO_RD			<= 1'b1;
-								end else if (MWC_WRITE_SRAM_DATA) begin
-									// Write from PIC microcontroller
-									MWC_CUR_STATE	<= MWC_S_PIC_OEIA;
-									SRAM_DQ_MUX		<= SRAM_DQ_MUX_PIC;
+									MWC_CUR_STATE	<= MWC_S_OEIA;
 								end else begin
-									// Nothing to do!
 									MWC_CUR_STATE	<= MWC_S_IDLE;
 								end
 							end
 
-			// ---- RAM write from FIFO ----
-			MWC_S_FIFO_OEIA:				begin
-								// FIFO_OEIA: Make OE inactive and load data from the FIFO
-								SRAM_OE_n_r			<= 1'b1;
-								FIFO_RD				<= 1'b0;
-								MWC_CUR_STATE		<= MWC_S_FIFO_WRITE_HI;
-							end
-							
-			MWC_S_FIFO_WRITE_HI:			begin
-								// FIFO_WRITE_HI: Write high byte
-								FIFO_QHALF			<=	FIFO_Q[15:8];
-								SRAM_WE_n_r			<= 1'b0;
-								MWC_CUR_STATE		<=	MWC_S_FIFO_WRITE_HI_END;
-							end
-							
-			MWC_S_FIFO_WRITE_HI_END:	begin
-								SRAM_WE_n_r			<=	1'b1;
-								MWC_CUR_STATE		<=	MWC_S_FIFO_INCR_HI;
-							end
-							
-			MWC_S_FIFO_INCR_HI:			begin
-								SRAM_WE_n_r			<=	1'b1;
-								SRA_INCREMENT_MWC	<=	1'b1;
-								MWC_CUR_STATE		<=	MWC_S_FIFO_WRITE_LO;
-							end
-
-			MWC_S_FIFO_WRITE_LO:			begin
-								// FIFO_WRITE_LO: Write low byte
-								FIFO_QHALF			<=	FIFO_Q[7:0];
-								SRAM_WE_n_r			<= 1'b0;
-								SRA_INCREMENT_MWC	<= 1'b0;
-								MWC_CUR_STATE		<=	MWC_S_FIFO_WRITE_LO_END;
-							end
-							
-			MWC_S_FIFO_WRITE_LO_END:	begin
-								SRAM_WE_n_r			<=	1'b1;
-								MWC_CUR_STATE		<=	MWC_S_FIFO_INCR_LO;
-							end
-							
-			MWC_S_FIFO_INCR_LO:			begin
-								SRAM_WE_n_r			<=	1'b1;
-								SRA_INCREMENT_MWC	<=	1'b1;
-								MWC_CUR_STATE		<=	MWC_S_IDLE;
-							end
-
-
-			// ---- RAM write from PIC micro ----
-			MWC_S_PIC_OEIA:				begin
-								// PIC_OEIA: Make OE inactive and load data
+			MWC_S_OEIA:		begin
+								// S_OEIA: Make OE inactive and load data
 								// FIFO latches data into its output FF
 								SRAM_OE_n_r			<= 1'b1;
-								MWC_CUR_STATE		<= MWC_S_PIC_WRITE;
+								MWC_CUR_STATE		<= MWC_S_WRITE;
 							end
 
-			MWC_S_PIC_WRITE:				begin
-								// PIC_WRITE: write to RAM
+			MWC_S_WRITE:	begin
+								// S_WRITE: write to RAM
 								SRAM_WE_n_r			<= 1'b0;
-//								SRA_INCREMENT_MWC	<= 1'b0;
-								MWC_CUR_STATE		<= MWC_S_PIC_WRITE_END;
+								SRA_INCREMENT_MWC	<= 1'b0;
+								MWC_CUR_STATE		<= MWC_S_WRITEEND;
 							end
 							
-			MWC_S_PIC_WRITE_END:			begin
-								// PIC_WRITE_END: End write cycle
+			MWC_S_WRITEEND:begin
+								// S_WRITEEND: End write cycle
 								SRAM_WE_n_r			<= 1'b1;
-								MWC_CUR_STATE		<= MWC_S_PIC_INCR;
+								MWC_CUR_STATE		<= MWC_S_INCADDR;
 							end
 
-			MWC_S_PIC_INCR:				begin
-								// PIC_INCR: End write and increment Address
+			MWC_S_INCADDR:	begin
+								// S_INCADDR: End write and increment Address
 								SRAM_WE_n_r			<= 1'b1;
 								SRA_INCREMENT_MWC	<= 1'b1;
 								MWC_CUR_STATE		<= MWC_S_IDLE;
@@ -381,7 +306,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		endcase
 	end
 
-	
+
 /////////////////////////////////////////////////////////////////////////////
 // Memory address counter
 
