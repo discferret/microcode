@@ -35,10 +35,10 @@ module main;
 	end
 
 	// Include testbench utilities
-	`include "tb_utils.v"
+	`include "../tb_utils.v"
 
 	// Include FIFO emulator
-	`include "tb_fifo.v"
+	`include "../tb_fifo.v"
 
 	//////////////////////////////////////////////////////////////////////////
 	// main testbench block
