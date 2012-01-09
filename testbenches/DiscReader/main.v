@@ -93,7 +93,7 @@ module main;
 		input dummy;
 		integer j, k, l;
 		begin
-			if (fifo_count == 0) begin
+			if (fifo_count < 1) begin
 				$display("/!\\  TESTBENCH ABORTED:  Attempt to sum an empty FIFO!");
 				$stop;
 			end
@@ -116,7 +116,7 @@ module main;
 	end
 	always @(posedge clock) begin
 		if (fifo_write) begin
-			if ((fifo_wrptr + 1) >= RAMBYTES) begin
+			if ((fifo_count + 1) >= RAMBYTES) begin
 				$display("/!\\  TESTBENCH ABORTED:  FIFO OVERFLOW!");
 				$stop;
 			end
