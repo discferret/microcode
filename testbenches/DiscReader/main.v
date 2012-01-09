@@ -11,6 +11,7 @@
  */
 
 `timescale 1ns / 1ns
+`define FINISH_ON_ABORT
 
 module main;
 
@@ -46,8 +47,20 @@ module main;
 	task waitclks;
 		input [31:0] clks;
 		integer i;
-		for (i=0; i<clks; i=i+1) begin
-			waitclk;
+		if (clks > 0) begin
+			for (i=0; i<clks; i=i+1) begin
+				waitclk;
+			end
+		end
+	endtask
+
+	task abort;
+		begin
+`ifndef FINISH_ON_ABORT
+			$stop;
+`else
+			$finish;
+`endif
 		end
 	endtask
 
@@ -78,14 +91,19 @@ module main;
 		begin
 			if (fifo_count < 1) begin
 				$display("/!\\  TESTBENCH ABORTED:  FIFO UNDERFLOW");
+`ifndef FINISH_ON_ABORT
 				$stop;
-			end
-`ifdef DEBUG
-			$display("FIFO POP  >> 0x%02x", fifo_buffer[fifo_rdptr]);
+`else
+				$finish;
 `endif
-			fifo_read = fifo_buffer[fifo_rdptr];
-			fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
-			fifo_count = fifo_count - 1;
+			end else begin
+`ifdef DEBUG
+				$display("FIFO POP  >> 0x%02x", fifo_buffer[fifo_rdptr]);
+`endif
+				fifo_read = fifo_buffer[fifo_rdptr];
+				fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
+				fifo_count = fifo_count - 1;
+			end
 		end
 	endfunction
 
@@ -95,18 +113,23 @@ module main;
 		begin
 			if (fifo_count < 1) begin
 				$display("/!\\  TESTBENCH ABORTED:  Attempt to sum an empty FIFO!");
+`ifndef FINISH_ON_ABORT
 				$stop;
-			end
-			j=0; k=fifo_count; l=0;
-			while (k > 0) begin
-				j = j + fifo_read(0);
-				k = k - 1;
-				l = l + 1;
-			end
-			fifo_sum=j;
-`ifdef DEBUG
-			$display("(i)  Sum of %d fifo bytes is %d", l, fifo_sum);
+`else
+				$finish;
 `endif
+			end else begin
+				j=0; k=fifo_count; l=0;
+				while (k > 0) begin
+					j = j + fifo_read(0);
+					k = k - 1;
+					l = l + 1;
+				end
+				fifo_sum=j;
+`ifdef DEBUG
+				$display("(i)  Sum of %d fifo bytes is %d", l, fifo_sum);
+`endif
+			end
 		end
 	endfunction
 
@@ -118,21 +141,23 @@ module main;
 		if (fifo_write) begin
 			if ((fifo_count + 1) >= RAMBYTES) begin
 				$display("/!\\  TESTBENCH ABORTED:  FIFO OVERFLOW!");
-				$stop;
-			end
-			// store byte
-			fifo_buffer[fifo_wrptr] = fifo_data;
-			fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
-			fifo_count = fifo_count + 1;
+				abort;
+			end else begin
+				// store byte
+				fifo_buffer[fifo_wrptr] = fifo_data;
+				fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
+				fifo_count = fifo_count + 1;
 `ifdef DEBUG
-			$display("FIFO PUSH >> 0x%x", fifo_data);
+				$display("FIFO PUSH >> 0x%x", fifo_data);
 `endif
+			end
 		end
 	end
 
 	//////////////////////////////////////////////////////////////////////////
 	// main testbench block
-	integer i;
+	integer i, j;
+	parameter TEST2_COUNT_MAX = 512;
 	initial begin
 		$display(">>>>>> DiscReader testbench started");
 		$dumpfile("discreader_tb.vcd");
@@ -157,8 +182,39 @@ module main;
 		i = fifo_sum(0);
 		if (i != 1) begin
 			$display(":-(   Test failed -- RAMSUM %d, expected %d", i, 1);
-			$stop;
+			abort;
 		end
+		$display("<<< TEST: Reset completed\n");
+
+		//////////////////////////////////////////////////////////////////////
+		// Now iterate over all sane timing values to make sure the timer and
+		// overflow logic works.
+		$display(">>> TEST: Counter/carry test, simple, from 1 to %d", TEST2_COUNT_MAX);
+		for (i=1; i<TEST2_COUNT_MAX; i=i+1) begin
+			// start with a pulse to force a store of whatever's in the
+			// timer register
+			rddata = 1;
+			waitclk;
+			rddata = 0;
+			// wait the desired number of clocks
+			waitclks(i);
+			// strobe read-data again
+			rddata = 1;
+			waitclk;
+			rddata = 0;
+			// give the disc writer chance to write to the fifo
+			waitclks(5+(i/127));
+			// now dump the first byte of the fifo (we don't care what it's
+			// set to, it'll be fairly arbitrary).
+			j = fifo_read(0);
+			// and get the sum of the remaining bytes
+			j = fifo_sum(0);
+			if (i != j) begin
+				$display("/!\\  MISMATCH: Expected sum=%d, got sum=%d!", i, j);
+				abort;
+			end
+		end
+		$display("<<< TEST: Counter/carry completed\n");
 
 		//////////////////////////////////////////////////////////////////////
 		// Make sure long data pulses are counted as one pulse
