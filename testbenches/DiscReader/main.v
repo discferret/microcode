@@ -17,12 +17,13 @@ module main;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Global pins / nets / regs
-	reg reset, run, rddata;
+	reg reset, run, rddata, index;
 	// Set initial states
 	initial begin
-		reset = 0;
-		run = 0;
-		rddata = 0;
+		reset	= 0;
+		run		= 0;
+		rddata	= 0;
+		index	= 0;
 	end
 
 	//////////////////////////////////////////////////////////////////////////
@@ -74,11 +75,14 @@ module main;
 		end
 		test_done;
 
+
 		//////////////////////////////////////////////////////////////////////
 		// Make sure long data pulses are counted as one pulse
 
+
 		//////////////////////////////////////////////////////////////////////
 		// Make sure long index pulses are counted as one pulse
+
 
 		//////////////////////////////////////////////////////////////////////
 		// Check timing -- num clock cycles matches sum
@@ -112,6 +116,7 @@ module main;
 		end
 		test_done;
 
+
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and data store
 		test_start("Collision between counter overflow and data store");
@@ -140,10 +145,47 @@ module main;
 			$sformat(str, "Second FIFO byte incorrect, expected carry (0x00), got 0x%0x", i);
 			abort(str);
 		end
+		if (fifo_count > 0) begin
+			fifo_dump;
+			abort("FIFO contained more data than expected! State dump above.");
+		end
 		test_done;
+
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and index store
+		test_start("Collision between counter overflow and index store");
+		// Start by sending a clear pulse, same as we did with the previous
+		// test.
+		rddata = 1;
+		waitclk;
+		rddata = 0;
+		// Wait 127 clocks then send an index pulse
+		waitclks(127);
+		index = 1;
+		waitclk;
+		index = 0;
+		// Wait 5 clocks for the DWE to finish storing
+		waitclks(5);
+		// Ditch the first byte
+		i = fifo_read(0);
+		// Make sure we got the expected data in the FIFO
+		i = fifo_read(0);
+		if (i != 'h7F) begin
+			$sformat(str, "First FIFO byte incorrect, expected carry (0x7F), got 0x%0x", i);
+			abort(str);
+		end
+		i = fifo_read(0);
+		if (i != 'h80) begin
+			$sformat(str, "Second FIFO byte incorrect, expected index carry (0x80), got 0x%0x", i);
+			abort(str);
+		end
+		if (fifo_count > 0) begin
+			fifo_dump;
+			abort("FIFO contained more data than expected! State dump above.");
+		end
+		test_done;
+
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between index store and data store
@@ -171,7 +213,7 @@ module main;
 		.CLKEN			(1'b1),		// TODO: clock enable
 		.RUN			(run),
 		.FD_RDDATA_IN	(rddata),
-		.FD_INDEX_IN	(1'b0),		// TODO: index
+		.FD_INDEX_IN	(index),
 		.RESET			(reset),
 		.DATA			(fifo_data),
 		.WRITE			(fifo_write)
