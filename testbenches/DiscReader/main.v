@@ -150,6 +150,28 @@ module main;
 		end
 	endfunction
 
+	task fifo_dump;
+		integer j, k, l;
+		begin
+			if (fifo_count < 1) begin
+				$display("/!\\  TESTBENCH ABORTED:  Attempt to dump an empty FIFO!");
+`ifndef FINISH_ON_ABORT
+				$stop;
+`else
+				$finish;
+`endif
+			end else begin
+				k=fifo_count; l=1;
+				while (k > 0) begin
+					j = fifo_read(0);
+					$display("FIFO byte %0d is 0x%0x", l, j);
+					k = k - 1;
+					l = l + 1;
+				end
+			end
+		end
+	endtask
+
 	initial begin
 		$display("FIFO initialised with %0d bytes of storage", RAMBYTES);
 		fifo_flush;
@@ -246,6 +268,31 @@ module main;
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and data store
 		test_start("Collision between counter overflow and data store");
+		// Start by sending a clear pulse, same as we did with the previous
+		// test.
+		rddata = 1;
+		waitclk;
+		rddata = 0;
+		// Wait 127 clocks then send another pulse
+		waitclks(127);
+		rddata = 1;
+		waitclk;
+		rddata = 0;
+		// Wait 5 clocks for the DWE to finish storing
+		waitclks(5);
+		// Ditch the first byte
+		i = fifo_read(0);
+		// Make sure we got the expected data in the FIFO
+		i = fifo_read(0);
+		if (i != 'h7F) begin
+			$sformat(str, "First FIFO byte incorrect, expected carry (0x7F), got 0x%0x", i);
+			abort(str);
+		end
+		i = fifo_read(0);
+		if (i != 'h00) begin
+			$sformat(str, "Second FIFO byte incorrect, expected carry (0x00), got 0x%0x", i);
+			abort(str);
+		end
 		test_done;
 
 		//////////////////////////////////////////////////////////////////////
