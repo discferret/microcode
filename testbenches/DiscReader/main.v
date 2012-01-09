@@ -55,12 +55,29 @@ module main;
 	endtask
 
 	task abort;
+		input [512*8:0] str;
 		begin
+			$display("/!\\  ABORT: %0s", str);
 `ifndef FINISH_ON_ABORT
 			$stop;
 `else
 			$finish;
 `endif
+		end
+	endtask
+
+	reg [60*8:0] last_test;
+	task test_start;
+		input [60*8:0] str;
+		begin
+			$display(">>> Test started:  %0s", str);
+			last_test = str;
+		end
+	endtask
+
+	task test_done;
+		begin
+			$display(">>> Test finished: %0s\n", last_test);
 		end
 	endtask
 
@@ -98,7 +115,7 @@ module main;
 `endif
 			end else begin
 `ifdef DEBUG
-				$display("FIFO POP  >> 0x%02x", fifo_buffer[fifo_rdptr]);
+				$display("FIFO POP  >> 0x%0x", fifo_buffer[fifo_rdptr]);
 `endif
 				fifo_read = fifo_buffer[fifo_rdptr];
 				fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
@@ -127,28 +144,27 @@ module main;
 				end
 				fifo_sum=j;
 `ifdef DEBUG
-				$display("(i)  Sum of %d fifo bytes is %d", l, fifo_sum);
+				$display("(i)  Sum of %0d fifo bytes is %0d", l, fifo_sum);
 `endif
 			end
 		end
 	endfunction
 
 	initial begin
-		$display("FIFO initialised with %d bytes of storage", RAMBYTES);
+		$display("FIFO initialised with %0d bytes of storage", RAMBYTES);
 		fifo_flush;
 	end
 	always @(posedge clock) begin
 		if (fifo_write) begin
 			if ((fifo_count + 1) >= RAMBYTES) begin
-				$display("/!\\  TESTBENCH ABORTED:  FIFO OVERFLOW!");
-				abort;
+				abort("FIFO Overflow!");
 			end else begin
 				// store byte
 				fifo_buffer[fifo_wrptr] = fifo_data;
 				fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
 				fifo_count = fifo_count + 1;
 `ifdef DEBUG
-				$display("FIFO PUSH >> 0x%x", fifo_data);
+				$display("FIFO PUSH >> 0x%0x", fifo_data);
 `endif
 			end
 		end
@@ -158,6 +174,7 @@ module main;
 	// main testbench block
 	integer i, j;
 	parameter TEST2_COUNT_MAX = 512;
+	reg [512*8:0] str;
 	initial begin
 		$display(">>>>>> DiscReader testbench started");
 `ifdef ENABLE_VCD_DUMP
@@ -167,7 +184,7 @@ module main;
 
 		//////////////////////////////////////////////////////////////////////
 		// Reset to sane default state
-		$display(">>> TEST: Reset");
+		test_start("Reset logic");
 		waitclks(2);
 		reset = 1;
 		waitclks(10);
@@ -183,10 +200,10 @@ module main;
 		// That should have caused a STORE of 1 clock
 		i = fifo_sum(0);
 		if (i != 1) begin
-			$display(":-(   Test failed -- RAMSUM %d, expected %d", i, 1);
-			abort;
+			$sformat(str, "Test failed. RAMSUM=%0d, wanted %0d", i, 1);
+			abort(str);
 		end
-		$display("<<< TEST: Reset completed\n");
+		test_done;
 
 		//////////////////////////////////////////////////////////////////////
 		// Make sure long data pulses are counted as one pulse
@@ -198,7 +215,8 @@ module main;
 		// Check timing -- num clock cycles matches sum
 		// Ierate over all sane timing values to make sure the timer and
 		// overflow logic works.
-		$display(">>> TEST: Counter/carry test, simple, from 1 to %d", TEST2_COUNT_MAX);
+		$sformat(str, "Counter/carry, simple, from 1 to %0d clocks", TEST2_COUNT_MAX);
+		test_start(str);
 		for (i=1; i<TEST2_COUNT_MAX; i=i+1) begin
 			// start with a pulse to force a store of whatever's in the
 			// timer register
@@ -219,14 +237,16 @@ module main;
 			// and get the sum of the remaining bytes
 			j = fifo_sum(0);
 			if (i != j) begin
-				$display("/!\\  MISMATCH: Expected sum=%d, got sum=%d!", i, j);
-				abort;
+				$sformat(str, "Test failed. FIFO_SUM=%0d, wanted %0d", j, i);
+				abort(str);
 			end
 		end
-		$display("<<< TEST: Counter/carry completed\n");
+		test_done;
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and data store
+		test_start("Collision between counter overflow and data store");
+		test_done;
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and index store
