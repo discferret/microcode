@@ -177,7 +177,7 @@ module main;
 		end
 		i = fifo_read(0);
 		if (i != 'h80) begin
-			$sformat(str, "Second FIFO byte incorrect, expected index carry (0x80), got 0x%0x", i);
+			$sformat(str, "Second FIFO byte incorrect, expected index with zero delay (0x80), got 0x%0x", i);
 			abort(str);
 		end
 		if (fifo_count > 0) begin
@@ -189,6 +189,41 @@ module main;
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between index store and data store
+		test_start("Collision between index store and data store");
+		// Start by sending a clear pulse, same as we did with the previous
+		// test.
+		rddata = 1;
+		waitclk;
+		rddata = 0;
+		// Wait 50 clocks then send an index pulse at the same time as a
+		// data pulse
+		waitclks(50);
+		index = 1;
+		rddata = 1;
+		waitclk;
+		index = 0;
+		rddata = 0;
+		// Wait 5 clocks for the DWE to finish storing
+		waitclks(10);
+		// Ditch the first byte
+		i = fifo_read(0);
+		// Make sure we got the expected data in the FIFO
+		i = fifo_read(0);
+		if (i != 'd50) begin
+			$sformat(str, "First FIFO byte incorrect, expected count of 50, got 0x%0x", i);
+			abort(str);
+		end
+		i = fifo_read(0);
+		if (i != 'h80) begin
+			$sformat(str, "Second FIFO byte incorrect, expected index with zero delay (0x80), got 0x%0x", i);
+			abort(str);
+		end
+		if (fifo_count > 0) begin
+			fifo_dump;
+			abort("FIFO contained more data than expected! State dump above.");
+		end
+		test_done;
+
 
 		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow, data store and index store
