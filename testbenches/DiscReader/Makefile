@@ -1,5 +1,8 @@
 TARGET	:= tb_DiscReader
-VLOGFILES	:= main.v
+VLOGFILES	:= \
+	Flag_Delay1tcy_OneCycle.v \
+	DiscReader.v \
+	main.v
 
 .PHONY:	test clean
 

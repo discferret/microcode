@@ -16,10 +16,12 @@ module main;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Global pins / nets / regs
-	reg reset;
+	reg reset, run, rddata;
 	// Set initial states
 	initial begin
 		reset = 0;
+		run = 0;
+		rddata = 0;
 	end
 
 	//////////////////////////////////////////////////////////////////////////
@@ -51,8 +53,8 @@ module main;
 
 	//////////////////////////////////////////////////////////////////////////
 	// RAM simulation -- actually emulates a FIFO...
-	reg fifo_write;
-	reg [7:0] fifo_data;
+	wire fifo_write;
+	wire [7:0] fifo_data;
 
 `ifndef MEMORY_SIZE
 	parameter RAMBYTES = 8;
@@ -136,26 +138,54 @@ module main;
 		$dumpfile("discreader_tb.vcd");
 		$dumpvars(0, main);
 
-		// Test reset
+		//////////////////////////////////////////////////////////////////////
+		// Reset to sane default state
 		$display(">>> TEST: Reset");
 		waitclks(2);
 		reset = 1;
 		waitclks(10);
 		reset = 0;
 
-		fifo_data = 111;
-		for (i=0; i<5; i=i+1) begin
-			fifo_write= 1;
-			waitclks(1);
-			fifo_write= 0;
-			waitclks(1);
-		end
+		// Flush the counter
+		run = 1;
+		rddata = 1;
+		waitclk;
+		rddata = 0;
+		waitclks(2);
+
+		// That should have caused a STORE of 1 clock
 		i = fifo_sum(0);
-		$display("%d", i);
+		if (i != 1) begin
+			$display(":-(   Test failed -- RAMSUM %d, expected %d", i, 1);
+			$stop;
+		end
+
+		//////////////////////////////////////////////////////////////////////
+		// Make sure long data pulses are counted as one pulse
+		// Make sure long index pulses are counted as one pulse
+		// Check timing -- num clock cycles matches sum
+		// Collision between counter overflow and data store
+		// Collision between counter overflow and index store
+		// Collision between index store and data store
+		// Collision between counter overflow, data store and index store
+		// Count with clock enable
 
 		////////// end of tests //////////
 		waitclks(10);
 		$finish;
 	end
+
+	////////////
+	// Instantiate a DiscReader
+	DiscReader _reader(
+		.CLOCK			(clock),
+		.CLKEN			(1'b1),		// TODO: clock enable
+		.RUN			(run),
+		.FD_RDDATA_IN	(rddata),
+		.FD_INDEX_IN	(1'b0),		// TODO: index
+		.RESET			(reset),
+		.DATA			(fifo_data),
+		.WRITE			(fifo_write)
+	);
 
 endmodule
