@@ -160,8 +160,10 @@ module main;
 	parameter TEST2_COUNT_MAX = 512;
 	initial begin
 		$display(">>>>>> DiscReader testbench started");
+`ifdef ENABLE_VCD_DUMP
 		$dumpfile("discreader_tb.vcd");
 		$dumpvars(0, main);
+`endif
 
 		//////////////////////////////////////////////////////////////////////
 		// Reset to sane default state
@@ -187,7 +189,14 @@ module main;
 		$display("<<< TEST: Reset completed\n");
 
 		//////////////////////////////////////////////////////////////////////
-		// Now iterate over all sane timing values to make sure the timer and
+		// Make sure long data pulses are counted as one pulse
+
+		//////////////////////////////////////////////////////////////////////
+		// Make sure long index pulses are counted as one pulse
+
+		//////////////////////////////////////////////////////////////////////
+		// Check timing -- num clock cycles matches sum
+		// Ierate over all sane timing values to make sure the timer and
 		// overflow logic works.
 		$display(">>> TEST: Counter/carry test, simple, from 1 to %d", TEST2_COUNT_MAX);
 		for (i=1; i<TEST2_COUNT_MAX; i=i+1) begin
@@ -217,14 +226,24 @@ module main;
 		$display("<<< TEST: Counter/carry completed\n");
 
 		//////////////////////////////////////////////////////////////////////
-		// Make sure long data pulses are counted as one pulse
-		// Make sure long index pulses are counted as one pulse
-		// Check timing -- num clock cycles matches sum
 		// Collision between counter overflow and data store
+
+		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow and index store
+
+		//////////////////////////////////////////////////////////////////////
 		// Collision between index store and data store
+
+		//////////////////////////////////////////////////////////////////////
 		// Collision between counter overflow, data store and index store
-		// Count with clock enable
+
+		//////////////////////////////////////////////////////////////////////
+		// Count with clock enable disabled (timer should freeze at current
+		// value while CLKEN == 0)
+
+		//////////////////////////////////////////////////////////////////////
+		// Count with RUN disabled (timer should reset and should NOT allow
+		// store if RUN == 0)
 
 		////////// end of tests //////////
 		waitclks(10);
