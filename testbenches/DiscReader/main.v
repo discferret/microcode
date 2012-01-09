@@ -33,65 +33,20 @@ module main;
 		#5 clock = ~clock;
 	end
 
-	//////////////////////////////////////////////////////////////////////////
-	// Wait one clock cycle
-	// TODO: Watchdog timer?
-	task waitclk;
-		begin
-			@(posedge clock) begin
-			end
-		end
-	endtask
-
-	// Wait multiple clock cycles
-	task waitclks;
-		input [31:0] clks;
-		integer i;
-		if (clks > 0) begin
-			for (i=0; i<clks; i=i+1) begin
-				waitclk;
-			end
-		end
-	endtask
-
-	task abort;
-		input [512*8:0] str;
-		begin
-			$display("/!\\  ABORT: %0s", str);
-`ifndef FINISH_ON_ABORT
-			$stop;
-`else
-			$finish;
-`endif
-		end
-	endtask
-
-	reg [60*8:0] last_test;
-	task test_start;
-		input [60*8:0] str;
-		begin
-			$display(">>> Test started:  %0s", str);
-			last_test = str;
-		end
-	endtask
-
-	task test_done;
-		begin
-			$display(">>> Test finished: %0s\n", last_test);
-		end
-	endtask
+	// Include testbench utilities
+	`include "tb_utils.v"
 
 	//////////////////////////////////////////////////////////////////////////
-	// RAM simulation -- actually emulates a FIFO...
+	// FIFO, or a reasonable facsimile of one.
 	wire fifo_write;
 	wire [7:0] fifo_data;
 
 `ifndef MEMORY_SIZE
-	parameter RAMBYTES = 8;
+	parameter FIFOSIZE = 512;
 `else
-	parameter RAMBYTES = `MEMORY_SIZE;
+	parameter FIFOSIZE = `MEMORY_SIZE;
 `endif
-	reg [7:0] fifo_buffer [RAMBYTES-1:0];
+	reg [7:0] fifo_buffer [FIFOSIZE-1:0];
 	integer fifo_wrptr, fifo_rdptr, fifo_count;
 
 	task fifo_flush;
@@ -118,7 +73,7 @@ module main;
 				$display("FIFO POP  >> 0x%0x", fifo_buffer[fifo_rdptr]);
 `endif
 				fifo_read = fifo_buffer[fifo_rdptr];
-				fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
+				fifo_rdptr = (fifo_rdptr + 1) % FIFOSIZE;
 				fifo_count = fifo_count - 1;
 			end
 		end
@@ -173,17 +128,17 @@ module main;
 	endtask
 
 	initial begin
-		$display("FIFO initialised with %0d bytes of storage", RAMBYTES);
+		$display("FIFO initialised with %0d bytes of storage", FIFOSIZE);
 		fifo_flush;
 	end
 	always @(posedge clock) begin
 		if (fifo_write) begin
-			if ((fifo_count + 1) >= RAMBYTES) begin
+			if ((fifo_count + 1) >= FIFOSIZE) begin
 				abort("FIFO Overflow!");
 			end else begin
 				// store byte
 				fifo_buffer[fifo_wrptr] = fifo_data;
-				fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
+				fifo_wrptr = (fifo_wrptr + 1) % FIFOSIZE;
 				fifo_count = fifo_count + 1;
 `ifdef DEBUG
 				$display("FIFO PUSH >> 0x%0x", fifo_data);
