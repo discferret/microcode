@@ -78,8 +78,9 @@ module main;
 				$display("/!\\  TESTBENCH ABORTED:  FIFO UNDERFLOW");
 				$stop;
 			end
-
+`ifdef DEBUG
 			$display("FIFO POP  >> 0x%02x", fifo_buffer[fifo_rdptr]);
+`endif
 			fifo_read = fifo_buffer[fifo_rdptr];
 			fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
 			fifo_count = fifo_count - 1;
@@ -88,19 +89,22 @@ module main;
 
 	function [31:0] fifo_sum;
 		input dummy;
-		integer i, j, k;
+		integer j, k, l;
 		begin
 			if (fifo_count == 0) begin
 				$display("/!\\  TESTBENCH ABORTED:  Attempt to sum an empty FIFO!");
 				$stop;
 			end
-			j=0;
-			k=fifo_count;
-			for (i=0; i<fifo_count; i=i+1) begin
+			j=0; k=fifo_count; l=0;
+			while (k > 0) begin
 				j = j + fifo_read(0);
+				k = k - 1;
+				l = l + 1;
 			end
 			fifo_sum=j;
-			$display("(i)  Sum of %d fifo bytes is %d", k, fifo_sum);
+`ifdef DEBUG
+			$display("(i)  Sum of %d fifo bytes is %d", l, fifo_sum);
+`endif
 		end
 	endfunction
 
@@ -118,7 +122,9 @@ module main;
 			fifo_buffer[fifo_wrptr] = fifo_data;
 			fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
 			fifo_count = fifo_count + 1;
+`ifdef DEBUG
 			$display("FIFO PUSH >> 0x%x", fifo_data);
+`endif
 		end
 	end
 
@@ -137,11 +143,15 @@ module main;
 		waitclks(10);
 		reset = 0;
 
-		fifo_data = 123;
-		fifo_write= 1;
-		waitclks(1);
-		fifo_write= 0;
+		fifo_data = 111;
+		for (i=0; i<5; i=i+1) begin
+			fifo_write= 1;
+			waitclks(1);
+			fifo_write= 0;
+			waitclks(1);
+		end
 		i = fifo_sum(0);
+		$display("%d", i);
 
 		////////// end of tests //////////
 		waitclks(10);
