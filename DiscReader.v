@@ -90,6 +90,7 @@ module DiscReader(CLOCK, CLKEN, RUN, FD_RDDATA_IN, FD_INDEX_IN, RESET, DATA, WRI
 				// We missed an index on the last cycle. Write one on this cycle.
 				DATA				<= 'd0;			// Set tick count to zero
 				DATA[BITS-1]	<= 1'b1;			// This store was caused by an index pulse
+				WRITE				<= 1'b1;			// Write it!
 			end
 		end
 	end
