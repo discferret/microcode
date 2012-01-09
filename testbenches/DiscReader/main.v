@@ -51,40 +51,80 @@ module main;
 
 	//////////////////////////////////////////////////////////////////////////
 	// RAM simulation -- actually emulates a FIFO...
-	wire ram_write;
-	wire [7:0] ram_data;
+	reg fifo_write;
+	reg [7:0] fifo_data;
 
 `ifndef MEMORY_SIZE
 	parameter RAMBYTES = 8;
 `else
 	parameter RAMBYTES = `MEMORY_SIZE;
 `endif
-	reg [7:0] ram_buffer [RAMBYTES-1:0];
-	integer rampos, ramcount;
+	reg [7:0] fifo_buffer [RAMBYTES-1:0];
+	integer fifo_wrptr, fifo_rdptr, fifo_count;
 
-	task ram_flush;
+	task fifo_flush;
 		begin
-			rampos = 0;
-			ramcount = 0;
+			fifo_wrptr = 0;
+			fifo_rdptr = 0;
+			fifo_count = 0;
 		end
 	endtask
 
-	initial begin
-		$display("RAM initialised with %d bytes of storage", RAMBYTES);
-		ram_flush;
-	end
-	always @(posedge ram_write) begin
-		if ((rampos + 1) >= RAMBYTES) begin
-			$display("/!\\  TESTBENCH ABORTED:  RAM OVERFLOW!");
-			$stop;
+	function [31:0] fifo_read;
+		input dummy;
+		reg [7:0] x;
+		begin
+			if (fifo_count < 1) begin
+				$display("/!\\  TESTBENCH ABORTED:  FIFO UNDERFLOW");
+				$stop;
+			end
+
+			$display("FIFO POP  >> 0x%02x", fifo_buffer[fifo_rdptr]);
+			fifo_read = fifo_buffer[fifo_rdptr];
+			fifo_rdptr = (fifo_rdptr + 1) % RAMBYTES;
+			fifo_count = fifo_count - 1;
 		end
-		// store byte
-		ram_buffer[rampos] = ram_data;
-		rampos = rampos + 1;
+	endfunction
+
+	function [31:0] fifo_sum;
+		input dummy;
+		integer i, j, k;
+		begin
+			if (fifo_count == 0) begin
+				$display("/!\\  TESTBENCH ABORTED:  Attempt to sum an empty FIFO!");
+				$stop;
+			end
+			j=0;
+			k=fifo_count;
+			for (i=0; i<fifo_count; i=i+1) begin
+				j = j + fifo_read(0);
+			end
+			fifo_sum=j;
+			$display("(i)  Sum of %d fifo bytes is %d", k, fifo_sum);
+		end
+	endfunction
+
+	initial begin
+		$display("FIFO initialised with %d bytes of storage", RAMBYTES);
+		fifo_flush;
+	end
+	always @(posedge clock) begin
+		if (fifo_write) begin
+			if ((fifo_wrptr + 1) >= RAMBYTES) begin
+				$display("/!\\  TESTBENCH ABORTED:  FIFO OVERFLOW!");
+				$stop;
+			end
+			// store byte
+			fifo_buffer[fifo_wrptr] = fifo_data;
+			fifo_wrptr = (fifo_wrptr + 1) % RAMBYTES;
+			fifo_count = fifo_count + 1;
+			$display("FIFO PUSH >> 0x%x", fifo_data);
+		end
 	end
 
 	//////////////////////////////////////////////////////////////////////////
 	// main testbench block
+	integer i;
 	initial begin
 		$display(">>>>>> DiscReader testbench started");
 		$dumpfile("discreader_tb.vcd");
@@ -96,6 +136,12 @@ module main;
 		reset = 1;
 		waitclks(10);
 		reset = 0;
+
+		fifo_data = 123;
+		fifo_write= 1;
+		waitclks(1);
+		fifo_write= 0;
+		i = fifo_sum(0);
 
 		////////// end of tests //////////
 		waitclks(10);
