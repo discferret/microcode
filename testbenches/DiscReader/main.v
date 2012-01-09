@@ -17,6 +17,10 @@ module main;
 	//////////////////////////////////////////////////////////////////////////
 	// Global pins / nets / regs
 	reg reset;
+	// Set initial states
+	initial begin
+		reset = 0;
+	end
 
 	//////////////////////////////////////////////////////////////////////////
 	// Clock generation
@@ -93,6 +97,8 @@ module main;
 		waitclks(10);
 		reset = 0;
 
+		////////// end of tests //////////
+		waitclks(10);
 		$finish;
 	end
 
