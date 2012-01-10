@@ -1,0 +1,46 @@
+DiscFerret Microcode Test Suite (MTS)
+=====================================
+
+This directory contains a series of test suites for various parts of the
+DiscFerret design (those which were written in pure Verilog HDL and can be
+adequately simulated inside Icarus Verilog).
+
+
+Requirements
+------------
+In order to run the testbenches, you will need:
+
+  - Icarus Verilog 0.9 or later
+    On Debian-based Linux systems, this is in the 'iverilog' package. You may
+    also want the 'gtkwave' waveform viewer if you're planning on debugging the
+    testbench or writing new tests.
+
+  - GNU Make (just about any fairly recent version will do)
+
+
+Running testbenches
+-------------------
+For the most part, the testbenches are automatic. Pick a directory (for
+instance, DiscReader), 'cd' into it, and type 'make'. The testbench will be
+compiled, then run inside the Icarus Verilog runtime.
+
+Each test is delimited on screen by a header line, may contain a series of debug
+lines, and is concluded with a trailer line and a blank line. In the event that
+a test fails, the test suite will abort and display an error message pointing to
+the cause of the failure.
+
+
+ModelSim compatibility
+----------------------
+It is entirely possible that the MTS test suite might work under ModelSim,
+however this:
+
+  - Has not been tested
+  - Is not supported
+  - Is probably not a good idea
+
+
+Please send questions and comments to <philpem@philpem.me.uk>, or ask in
+#discferret on irc.freenode.net.
+
+- Phil Pemberton, Tue 10 Jan 2012.
