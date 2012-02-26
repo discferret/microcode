@@ -94,21 +94,41 @@ module top(
 	// NOTE: If you change the frequency of CLK_DATASEP, then update this value!
 	localparam CLK_DATASEP_FREQ = 32'd40_000_000;
 		
-	// Clock divider to produce pulses 500us and 250us apart from CLK_MASTER
-	// 250us = 4kHz. We set the counter for 500us pulses, then generate an extra pulse.
-	reg [15:0] master_clk_counter;
+	// Clock divider to produce pulses spaced 500us apart from CLK_MASTER
+	reg [15:0] master_clk500_counter;
 	always @(posedge CLK_MASTER) begin
-		if (master_clk_counter < (CLK_MASTER_FREQ / 32'd2_000)) begin
-			master_clk_counter <= master_clk_counter + 16'd1;
+		if (master_clk500_counter < (CLK_MASTER_FREQ / 32'd2_000)) begin
+			master_clk500_counter <= master_clk500_counter + 16'd1;
 		end else begin
-			master_clk_counter <= 16'd0;
+			master_clk500_counter <= 16'd0;
 		end
 	end
+	wire CKE_500US	=	(master_clk500_counter == 16'd0);
 
-	// 500us only generates one pulse per counter cycle
-	wire CKE_500US	=	(master_clk_counter == 16'd0);
-	// 250us generates an extra pulse mid-count
-	wire CKE_250US	=	(master_clk_counter == 16'd0) || (master_clk_counter == (CLK_MASTER_FREQ / 32'd4_000));
+	/*
+	 * Clock divider to produce step pulses from CLK_MASTER
+	 * It takes two step pulses to produce one step.
+	 * So if we set INDEX_FREQ to 16000 (16kHz), then the step resolution
+	 * will be:
+	 *    SR = 1/(Freq/2)
+	 *       = 1/(16000/2)
+	 *       = 1/8000
+	 *       = 0.000125 seconds
+	 *       = 125 microseconds
+	 * If STEPRATE = 0, then you get a 125us step rate.
+	 * STEPRATE = 1 is 250us.
+	 * ... And so on until ...
+	 * STEPRATE = 255 is 32000us, or 32ms.
+	 */
+	reg [15:0] master_stepclk_counter;
+	always @(posedge CLK_MASTER) begin
+		if (master_stepclk_counter < (CLK_MASTER_FREQ / 32'd16_000)) begin
+			master_stepclk_counter <= master_stepclk_counter + 16'd1;
+		end else begin
+			master_stepclk_counter <= 16'd0;
+		end
+	end
+	wire CKE_STEP	=	(master_stepclk_counter == 16'd0);
 
 	// Clock divider -- converts CLK_MASTER into a 10us repetitive pulse train
 	reg [15:0] index_clk_counter;
@@ -649,7 +669,7 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	reg [7:0] step_rate_counter;
 	reg step_ck_div_tgl;
 	always @(posedge CLK_MASTER) begin
-		if (CKE_250US) begin
+		if (CKE_STEP) begin
 			if (step_rate_counter != STEP_RATE) begin
 				step_rate_counter <= step_rate_counter + 8'd1;
 			end else begin
