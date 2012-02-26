@@ -70,6 +70,8 @@ module StepController(
 			num_steps <= 7'b000_0000;
 			DIR_OUT <= 1'b1;
 			STEP_REG <= 1'b0;
+			// reset T0HIT if the module is being reset
+			TKSENSE_RST <= 1'b1;
 		end else begin
 			case (cur_state)
 				S_IDLE:	begin
