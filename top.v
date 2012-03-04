@@ -66,7 +66,7 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
 	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h0029;		// Microcode version
+	localparam	MCO_VERSION	= 16'h002A;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -607,6 +607,10 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						STEP_RATE <= MCU_PMD;
 					 end
 
+			8'hFE: begin			// STEP_EXT  -- Disc drive step extension
+						// Note: other logic for this state below.
+					 end
+
 			8'hFF: begin			// STEP_CMD  -- Disc drive step command
 						// Note: other logic for this state below.
 					 end
@@ -687,7 +691,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		.STEPCLK			(STEP_CLK),				// Step-rate clock enable
 		.RESET			(1'b0),					// Reset -- TODO: connect to main reset
 		.CTLBYTE			(MCU_PMD),				// Control byte; MSB=direction, rest=num of steps
-		.WRITE			((MCU_ADDR[7:0] == 8'hFF) && MCU_PMWR_sync),		// Write (+ve level triggered)
+		.WRITE_EXT		((MCU_ADDR[7:0] == 8'hFE) && MCU_PMWR_sync),		// Write Extension Reg. (+ve level triggered)
+		.WRITE_CMD		((MCU_ADDR[7:0] == 8'hFF) && MCU_PMWR_sync),		// Write Command Reg.   (+ve level triggered)
 		.IS_STEPPING	(SR_FDS_STEPPING),	// 1 = state machine is stepping the drive head
 		.STEP_OUT_n		(FD_STEP),				// Output to  FDD: step
 		.DIR_OUT			(FD_DIR),				// Output to  FDD: direction

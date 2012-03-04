@@ -3,7 +3,8 @@ module StepController(
 	STEPCLK,			// Step-rate clock
 	RESET,			// Synchronous reset
 	CTLBYTE,			// Control byte -- MSB=direction
-	WRITE,			// Write input (+ve level triggered)
+	WRITE_EXT,		// Write Extension Register input (+ve level triggered)
+	WRITE_CMD,		// Write Command input (+ve level triggered)
 	IS_STEPPING,	// Output -- 1 if state machine is stepping
 	STEP_OUT_n,		// Output to FDD: step signal
 	DIR_OUT,			// Output to FDD: direction signal
@@ -15,7 +16,8 @@ module StepController(
 	input					STEPCLK;
 	input					RESET;
 	input		[7:0]		CTLBYTE;
-	input					WRITE;
+	input					WRITE_EXT;
+	input					WRITE_CMD;
 	output				IS_STEPPING;
 	output				STEP_OUT_n;
 	output	reg		DIR_OUT;
@@ -35,13 +37,13 @@ module StepController(
 	parameter	S_IDLE	= 3'b000,
 					S_STEP1	= 3'b001,
 					S_STEP2	= 3'b010,
-					S_STEP3 = 3'b011;
+					S_STEP3	= 3'b011;
 
 	// Current FSM state
 	reg [2:0] cur_state;
 
-	// Number of disc steps remaining
-	reg [6:0] num_steps;
+	// Number of disc steps remaining -- 15 bit counter with extension
+	reg [14:0] num_steps;
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -67,7 +69,7 @@ module StepController(
 		if (RESET == 1'b1) begin
 			// Reset active, set state to IDLE
 			cur_state <= S_IDLE;
-			num_steps <= 7'b000_0000;
+			num_steps <= 15'd0;
 			DIR_OUT <= 1'b1;
 			STEP_REG <= 1'b0;
 			// reset T0HIT if the module is being reset
@@ -77,11 +79,16 @@ module StepController(
 				S_IDLE:	begin
 								// Idle state. Entered on reset.
 								STEP_REG <= 1'b0;
-								// Wait for WRITE=1, then latch number of steps
-								// and direction and enter STEP1 on next clock
-								if (WRITE == 1'b1) begin
+								if (WRITE_EXT == 1'b1) begin
+									// WRITE EXTENSION REGISTER. Latch high part of
+									// step count. Does NOT initiate a seek.
+									num_steps[14:7] <= CTLBYTE[7:0];
+									cur_state <= S_IDLE;
+								end else	if (WRITE_CMD == 1'b1) begin
+									// WRITE COMMAND REGISTER. Latch number of steps
+									// and direction and enter STEP1 on next clock
 									cur_state <= S_STEP1;
-									num_steps <= CTLBYTE[6:0];
+									num_steps[6:0] <= CTLBYTE[6:0];
 									DIR_OUT <= CTLBYTE[7];
 								end else begin
 									cur_state <= S_IDLE;
@@ -122,6 +129,7 @@ module StepController(
 								if (TRACK0_IN && DIR_OUT) begin
 									// Seeking out and tk0 active; this is a track0 hit.
 									TKSENSE_SET <= 1'b1;
+									num_steps <= 15'd0;
 									cur_state <= S_IDLE;
 								end else begin
 									if (STEPCLK == 1'b1) begin
@@ -130,7 +138,7 @@ module StepController(
 										// Track 0 guard -- refuse to step if the drive is
 										// at track 0 and direction = 1 (out)
 										// Keep looping until num_steps rolls over
-										if ((num_steps != 7'b000_0000) && (!(TRACK0_IN && DIR_OUT))) begin
+										if ((num_steps != 15'd0) && (!(TRACK0_IN && DIR_OUT))) begin
 											cur_state <= S_STEP1;
 										end else begin
 											cur_state <= S_IDLE;
