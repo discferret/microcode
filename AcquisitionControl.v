@@ -157,17 +157,20 @@ assign debug={
 		.clkB (CLK_MASTER),		.SignalOut (FD_INDEX_IN_sync)
 	);
 	
-	wire ACQ_STARTEVT_MATCH		=	((ACQ_START_MASK[1:0] == 2'b01) && FD_INDEX_IN_sync) ||
-									((ACQ_START_MASK[1:0] == 2'b10) && SYNCWD_START_EVT_DETECTED_sync);
+	wire ACQ_STARTEVT_MATCH		=	((ACQ_START_MASK[0]) && FD_INDEX_IN_sync) ||				// Index
+									((ACQ_START_MASK[1]) && SYNCWD_START_EVT_DETECTED_sync) ||	// MFM Syncword detect
+									(ACQ_START_MASK[2]);														// Always
 	// Delay 1tcy and limit to one clock cycle
 	wire ACQ_STARTEVT_MATCH_sync;
 	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STARTEVT_SYNC(CLK_MASTER, ACQ_STARTEVT_MATCH, ACQ_STARTEVT_MATCH_sync);
 
 
 	//// STOP event triggers
-	wire ACQ_STOPEVT_MATCH		=	((ACQ_STOP_MASK[1:0] == 2'b01) && FD_INDEX_IN) ||
-									((ACQ_STOP_MASK[1:0] == 2'b10) && SYNCWD_STOP_EVT_DETECTED_sync) ||
-									(SR_R_FULL);
+	// Yes, I know STOP ALWAYS is silly, but it's here for consistency with the
+	// START EVENT MASK register.
+	wire ACQ_STOPEVT_MATCH		=	((ACQ_STOP_MASK[0]) && FD_INDEX_IN) ||						// Index
+									((ACQ_STOP_MASK[1]) && SYNCWD_STOP_EVT_DETECTED_sync) ||		// MFM Syncword detect
+									(ACQ_STOP_MASK[2]);														// Always
 	// Delay 1tcy and limit to one clock cycle
 	wire ACQ_STOPEVT_MATCH_sync;
 	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STOPEVT_SYNC(CLK_MASTER, ACQ_STOPEVT_MATCH, ACQ_STOPEVT_MATCH_sync);
@@ -211,8 +214,7 @@ assign debug={
 
 			SSFSM_S_WAIT:	begin
 								// WAIT: Wait for START event
-								// If no start mask is set, then acq will start immediately.
-								if (ACQ_STARTEVT_MATCH_sync || (ACQ_START_MASK[1:0] == 2'b00)) begin
+								if (ACQ_STARTEVT_MATCH_sync) begin
 									if (SCOUNT > 0) begin
 										// counter nonzero, decrement and keep waiting
 										SCOUNT <= SCOUNT - 8'd1;
@@ -238,16 +240,22 @@ assign debug={
 							end
 
 			SSFSM_S_ACQ:	begin
-								// ACQUIRE: Acquire until /n/ STOP events
+								// ACQUIRE: Acquire until /n/ STOP events, or RAM full
 								// Wait for a stop event
-								if (ACQ_STOPEVT_MATCH_sync || (ACQ_STOP_MASK == 3'b0)) begin
-									if (ECOUNT > 0) begin
-										// end counter nonzero, keep acquiring
-										ECOUNT <= ECOUNT - 8'd1;
-										SSFSM_CUR_STATE <= SSFSM_S_ACQ;
-									end else begin
-										// counter=0, we're done. end the acq cycle and go home.
-										SSFSM_CUR_STATE <= SSFSM_S_IDLE;
+								if (SR_R_FULL) begin
+									// RAM Full causes an immediate abort
+									SSFSM_CUR_STATE <= SSFSM_S_IDLE;
+								end else begin
+									// RAM not full yet, is this a valid stop event?
+									if (ACQ_STOPEVT_MATCH_sync) begin
+										if (ECOUNT > 0) begin
+											// end counter nonzero, keep acquiring
+											ECOUNT <= ECOUNT - 8'd1;
+											SSFSM_CUR_STATE <= SSFSM_S_ACQ;
+										end else begin
+											// counter=0, we're done. end the acq cycle and go home.
+											SSFSM_CUR_STATE <= SSFSM_S_IDLE;
+										end
 									end
 								end
 							end
