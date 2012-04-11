@@ -160,20 +160,14 @@ assign debug={
 	wire ACQ_STARTEVT_MATCH		=	((ACQ_START_MASK[0]) && FD_INDEX_IN_sync) ||				// Index
 									((ACQ_START_MASK[1]) && SYNCWD_START_EVT_DETECTED_sync) ||	// MFM Syncword detect
 									(ACQ_START_MASK[2]);														// Always
-	// Delay 1tcy and limit to one clock cycle
-	wire ACQ_STARTEVT_MATCH_sync;
-	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STARTEVT_SYNC(CLK_MASTER, ACQ_STARTEVT_MATCH, ACQ_STARTEVT_MATCH_sync);
 
 
 	//// STOP event triggers
 	// Yes, I know STOP ALWAYS is silly, but it's here for consistency with the
 	// START EVENT MASK register.
-	wire ACQ_STOPEVT_MATCH		=	((ACQ_STOP_MASK[0]) && FD_INDEX_IN) ||						// Index
+	wire ACQ_STOPEVT_MATCH		=	((ACQ_STOP_MASK[0]) && FD_INDEX_IN_sync) ||				// Index
 									((ACQ_STOP_MASK[1]) && SYNCWD_STOP_EVT_DETECTED_sync) ||		// MFM Syncword detect
 									(ACQ_STOP_MASK[2]);														// Always
-	// Delay 1tcy and limit to one clock cycle
-	wire ACQ_STOPEVT_MATCH_sync;
-	Flag_Delay1tcy_OneCycle _fd1oc_ACQ_STOPEVT_SYNC(CLK_MASTER, ACQ_STOPEVT_MATCH, ACQ_STOPEVT_MATCH_sync);
 
 	// event detection state machine
 	parameter SSFSM_S_IDLE			= 3'b000;
@@ -214,7 +208,7 @@ assign debug={
 
 			SSFSM_S_WAIT:	begin
 								// WAIT: Wait for START event
-								if (ACQ_STARTEVT_MATCH_sync) begin
+								if (ACQ_STARTEVT_MATCH) begin
 									if (SCOUNT > 0) begin
 										// counter nonzero, decrement and keep waiting
 										SCOUNT <= SCOUNT - 8'd1;
@@ -247,7 +241,7 @@ assign debug={
 									SSFSM_CUR_STATE <= SSFSM_S_IDLE;
 								end else begin
 									// RAM not full yet, is this a valid stop event?
-									if (ACQ_STOPEVT_MATCH_sync) begin
+									if (ACQ_STOPEVT_MATCH) begin
 										if (ECOUNT > 0) begin
 											// end counter nonzero, keep acquiring
 											ECOUNT <= ECOUNT - 8'd1;
