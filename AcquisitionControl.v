@@ -152,11 +152,8 @@ assign debug={
 
 	// Sync index pulse to clk40MHZ
 	wire FD_INDEX_IN_sync;
-	Signal_CrossDomain_As_Flag _scdaf_fd_index(
-		.clkA (CLK_MASTER),		.SignalIn  (FD_INDEX_IN),
-		.clkB (CLK_MASTER),		.SignalOut (FD_INDEX_IN_sync)
-	);
-	
+	Flag_Delay1tcy_OneCycle _fd1oc_fd_index(.clk(CLK_MASTER), .in(FD_INDEX_IN), .out(FD_INDEX_IN_sync));
+
 	wire ACQ_STARTEVT_MATCH		=	((ACQ_START_MASK[0]) && FD_INDEX_IN_sync) ||				// Index
 									((ACQ_START_MASK[1]) && SYNCWD_START_EVT_DETECTED_sync) ||	// MFM Syncword detect
 									(ACQ_START_MASK[2]);														// Always
