@@ -2,6 +2,7 @@ syntax: glob
 db/*
 output/*
 incremental_db/*
+greybox_tmp/*
 *.rpt
 *.log
 *.summary
@@ -19,3 +20,6 @@ undo_redo.txt
 ate.v
 *.dpf
 *.rbf
+*.srf
+*.qdf
+
