@@ -3,8 +3,8 @@
  * Philip Pemberton, 2012.
  *
  * This is a complete rewrite of the original DiscFerret MDR module, and fixes
- * a (rather large) number of race conditions and ambiguities which caused
- * data corruption issues when 
+ * a number of race conditions and ambiguities which caused data corruption
+ * issues.
  *
  * This version both has a Verilog testbench, and has been tested against it.
  * Acquisition is proven to work (using Icarus Verilog and GTKWave).
