@@ -44,8 +44,6 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 	parameter	ST_IDLE			=	4'd0;		// Idle state
 	parameter	ST_LOOP			=	4'd1;		// Main loop
 	parameter	ST_TIMERWAIT	=	4'd3;		// Timer wait
-//	parameter	ST_STROBE		=	4'd4;		// Send write pulse
-	parameter	ST_WRGATE		=	4'd5;		// Set write gate
 	parameter	ST_INDEXWAIT	=	4'd7;		// Wait for index pulse (#2)
 	parameter	ST_WAITHSTM		=	4'd8;		// Wait for track mark
 
@@ -106,21 +104,23 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 									end else
 									if (mdat == 8'b0000_0010) begin
 										// 0b0000_0010: WRITE PULSE
-										//state <= ST_STROBE;
-											// Send a write strobe
-											wrdat_r <= 1'b1;
-											maddr_inc <= 1'b1;
-											state <= ST_LOOP;										
+										// Send a write strobe
+										wrdat_r <= 1'b1;
+										maddr_inc <= 1'b1;
+										state <= ST_LOOP;
 									end else
 									if (mdat[7:1] == 7'b0000_000) begin
 										// 0b0000_000n: SET WRITE GATE
-										state <= ST_WRGATE;
+										// Load write gate, increment PC and jump back to LOOP
+										wrgate <= ~cur_instr[0];
+										maddr_inc <= 1'b1;
+										state <= ST_LOOP;
 									end else begin
 										// nothing happens if we don't recognise the command...
 										state <= ST_LOOP;
 									end
 								end
-				
+
 					ST_TIMERWAIT: begin
 							// TIMER state 1:
 							// Wait for the timer to clear
@@ -131,22 +131,7 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 								state <= ST_LOOP;
 							end
 						end
-/*
-					ST_STROBE: begin
-							// Send a write strobe
-							wrdat_r <= 1'b1;
-							maddr_inc <= 1'b1;
-							state <= ST_LOOP;
-						end
-*/
-					ST_WRGATE: begin
-							// SET WRITE GATE						
-							// Load write gate, increment PC and jump back to INIT state
-							wrgate <= ~cur_instr[0];
-							maddr_inc <= 1'b1;
-							state <= ST_LOOP;
-						end
-						
+
 					ST_INDEXWAIT: begin
 							// WAIT FOR N INDEX PULSES state 1
 							// Wait for the index counter to clear
@@ -159,7 +144,7 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 							end
 							// Else we just keep spinning here until the counter decrements
 						end
-					
+
 					ST_WAITHSTM: begin
 							// WAIT HARD SECTOR TRACK MARKER
 							if (trkmark) begin
