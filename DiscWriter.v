@@ -71,9 +71,11 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 									// Terminate write data pulse
 									wrdat_r <= 1'b0;
 									wrgate <= 1'b1;
-									
+
 									// stay in current state unless START=1
 									if (start) begin
+										// Start requested -- increment memory address and advance to the processing loop
+										maddr_inc <= 1'b1;
 										state <= ST_LOOP;
 									end else begin
 										state <= ST_IDLE;
