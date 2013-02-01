@@ -1,0 +1,11 @@
+syntax: glob
+
+# vim temporary files
+*~
+.*.sw?
+
+# value change dumps
+*.vcd
+
+# output binaries
+tb_*

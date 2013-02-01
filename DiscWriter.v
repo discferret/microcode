@@ -39,15 +39,11 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 	
 	// latched copy of current instruction byte
 	reg	[7:0]	cur_instr;
-
+	
 	// machine states
 	parameter	ST_IDLE			=	4'd0;		// Idle state
 	parameter	ST_LOOP			=	4'd1;		// Main loop
-	parameter	ST_TIMER			=	4'd2;		// Timer load
 	parameter	ST_TIMERWAIT	=	4'd3;		// Timer wait
-	parameter	ST_STROBE		=	4'd4;		// Send write pulse
-	parameter	ST_WRGATE		=	4'd5;		// Set write gate
-	parameter	ST_WAITIDX		=	4'd6;		// Wait for index pulse (#1)
 	parameter	ST_INDEXWAIT	=	4'd7;		// Wait for index pulse (#2)
 	parameter	ST_WAITHSTM		=	4'd8;		// Wait for track mark
 
@@ -62,18 +58,22 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 			cur_instr <= 8'b0111_1111;		// STOP
 		end else begin
 			if (clken) begin
+				// Clear any active write-data pulses or memory increments
+				wrdat_r <= 1'b0;
+				maddr_inc <= 1'b0;
+				
 				case (state)
 					ST_IDLE:	begin
 									// IDLE: State machine idle
 
-									// Clear MADDR_INC (increment memory address -- set if MADDR incremented)
-									maddr_inc <= 1'b0;
 									// Terminate write data pulse
 									wrdat_r <= 1'b0;
 									wrgate <= 1'b1;
-									
+
 									// stay in current state unless START=1
 									if (start) begin
+										// Start requested -- increment memory address and advance to the processing loop
+										maddr_inc <= 1'b1;
 										state <= ST_LOOP;
 									end else begin
 										state <= ST_IDLE;
@@ -83,20 +83,16 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 					ST_LOOP: begin
 									// LOOP: Main state machine loop
 									
-									// Clear any active write-data pulses or memory increments
-									wrdat_r <= 1'b0;
-									maddr_inc <= 1'b0;
-
 									// Latch current instruction
 									cur_instr <= mdat;
 									
 									if (mdat[7] == 1'b1) begin
 										// 0b1nnn_nnnn: TIMER LOAD n
-										state <= ST_TIMER;
+										state <= ST_TIMERWAIT;
 									end else
 									if (mdat[7:6] == 2'b01) begin
 										// 0b01nn_nnnn: WAIT n INDEX PULSES
-										state <= ST_WAITIDX;
+										state <= ST_INDEXWAIT;
 									end else
 									if (mdat == 8'b0011_1111) begin
 										// 0b0011_1111: STOP
@@ -108,24 +104,23 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 									end else
 									if (mdat == 8'b0000_0010) begin
 										// 0b0000_0010: WRITE PULSE
-										state <= ST_STROBE;
+										// Send a write strobe
+										wrdat_r <= 1'b1;
+										maddr_inc <= 1'b1;
+										state <= ST_LOOP;
 									end else
 									if (mdat[7:1] == 7'b0000_000) begin
 										// 0b0000_000n: SET WRITE GATE
-										state <= ST_WRGATE;
+										// Load write gate, increment PC and jump back to LOOP
+										wrgate <= ~cur_instr[0];
+										maddr_inc <= 1'b1;
+										state <= ST_LOOP;
 									end else begin
 										// nothing happens if we don't recognise the command...
 										state <= ST_LOOP;
 									end
 								end
 
-					ST_TIMER: begin
-							// TIMER state 0: load the timer value
-							// Note that the logic below loads and decrements the counter
-							// Jump to "wait for timer to clear" state
-							state <= ST_TIMERWAIT;
-						end
-					
 					ST_TIMERWAIT: begin
 							// TIMER state 1:
 							// Wait for the timer to clear
@@ -136,28 +131,7 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 								state <= ST_LOOP;
 							end
 						end
-						
-					ST_STROBE: begin
-							// Send a write strobe
-							wrdat_r <= 1'b1;
-							maddr_inc <= 1'b1;
-							state <= ST_LOOP;
-						end
 
-					ST_WRGATE: begin
-							// SET WRITE GATE						
-							// Load write gate, increment PC and jump back to INIT state
-							wrgate <= ~cur_instr[0];
-							maddr_inc <= 1'b1;
-							state <= ST_LOOP;
-						end
-					
-					ST_WAITIDX: begin
-							// WAIT FOR N INDEX PULSES state 0
-							// Note that the load logic for the counter is located below, outside of the state machine
-							state <= ST_INDEXWAIT;
-						end
-						
 					ST_INDEXWAIT: begin
 							// WAIT FOR N INDEX PULSES state 1
 							// Wait for the index counter to clear
@@ -170,7 +144,7 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 							end
 							// Else we just keep spinning here until the counter decrements
 						end
-					
+
 					ST_WAITHSTM: begin
 							// WAIT HARD SECTOR TRACK MARKER
 							if (trkmark) begin
@@ -200,9 +174,9 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 			// reset timer to zero
 			timerreg <= 7'd0;
 		end else if (clken) begin
-			if (state == ST_TIMER) begin
+			if ((state == ST_LOOP) && (mdat[7] == 1'b1)) begin
 				// load timer from lowest 7 bits of current instruction
-				timerreg <= cur_instr[6:0];
+				timerreg <= mdat[6:0];
 			end else begin
 				// decrement timer register, unless it's already zero
 				if (timerreg > 7'd0) begin
@@ -233,9 +207,9 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 			// reset index counter to zero
 			indexcounter <= 6'd0;
 		end else if (clken) begin
-			if (state == ST_WAITIDX) begin
+			if ((state == ST_LOOP) && (mdat[7:6] == 2'b01)) begin
 				// load counter from lowest 6 bits of current instruction byte
-				indexcounter <= cur_instr[5:0];
+				indexcounter <= mdat[5:0];
 			end else begin
 				// when an index pulse occurs, decrement the counter
 				// unless it's already =0, in which case, hold at zero.
@@ -254,7 +228,7 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 			wrdata <= 1'b1;
 		end else if (clken) begin
 			if (wrdat_r == 1'b1) begin
-				writetimer <= 8'd60;
+				writetimer <= 8'd60;				/// FIXME: Magic number.
 				wrdata <= 1'b0;
 			end else if (writetimer > 1'b0) begin
 				writetimer <= writetimer - 1'b1;
@@ -267,3 +241,5 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 	end
 
 endmodule
+
+// vim: ts=3
