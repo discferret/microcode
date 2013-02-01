@@ -13,4 +13,5 @@ clean:
 	rm -f $(TARGET) *~
 
 $(TARGET): $(VLOGFILES)
-	iverilog -o $@ $^
+	iverilog -DENABLE_VCD_DUMP -o $@ $^
+
