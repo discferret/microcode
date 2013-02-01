@@ -241,3 +241,5 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 	end
 
 endmodule
+
+// vim: ts=3
