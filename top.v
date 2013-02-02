@@ -66,7 +66,7 @@ module top(
 /////////////////////////////////////////////////////////////////////////////
 // System version numbers
 	localparam	MCO_TYPE		= 16'hDD55;		// Microcode type
-	localparam	MCO_VERSION	= 16'h002D;		// Microcode version
+	localparam	MCO_VERSION	= 16'h002E;		// Microcode version
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -440,6 +440,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 	reg	[15:0]	MFM_MASK_START;		// MFM mask word, start event
 	reg	[15:0]	MFM_MASK_STOP;			// MFM mask word, stop  event
 
+	reg	[7:0]		WR_PULSE_WIDTH;		// Write pulse width
+	
 	reg	[7:0]		SCRATCHPAD;				// 8-bit scratchpad register (used by ATE for bus interface testing)
 	
 	reg	[7:0]		SRAM_DQ_LAT;			// Read-data from the SRAM, latched on L->H edge on PMRD
@@ -595,6 +597,10 @@ localparam STATUSLED_BLINK_ONLY = 0;
 						SCRATCHPAD <= MCU_PMD[7:0];
 					 end
 
+			8'hD0: begin			// WRITE_PULSE_WIDTH -- write engine DWR pulse width
+						WR_PULSE_WIDTH <= MCU_PMD[7:0];
+					 end
+					 
 			8'hE0: begin			// HSIO_DIR
 						HSIO_DIR <= MCU_PMD[3:0];
 					 end
@@ -782,7 +788,8 @@ localparam STATUSLED_BLINK_ONLY = 0;
 		.trkmark					(TMD_DISCWRITER),
 		.index					(FD_INDEX_IN),
 		.start					(ACQCON_WRITE_sync),
-		.running					(ACQSTAT_WRITING)
+		.running					(ACQSTAT_WRITING),
+		.wd_width				(WR_PULSE_WIDTH)
 	);
 
 endmodule

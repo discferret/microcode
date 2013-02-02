@@ -18,18 +18,19 @@
 // Additional Comments: 
 //
 //////////////////////////////////////////////////////////////////////////////////
-module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark, index, start, running);
+module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark, index, start, running, wd_width);
 	input							reset;		// state machine reset
 	input							clock;		// master state machine clock
 	input							clken;		// master state machine clock enable
 	input				[7:0]		mdat;			// memory data in
 	output	reg				maddr_inc;	// memory address increment
-	output	reg				wrdata;		// write data
+	output						wrdata;		// write data
 	output	reg				wrgate;		// write gate
 	input							trkmark;		// track mark detect input
 	input							index;		// index pulse detect input
 	input							start;		// START WRITE input
 	output						running;		// write engine running
+	input				[7:0]		wd_width;	// write data pulse width
 
 	// write data input to pulse stretcher
 	reg	wrdat_r;
@@ -222,23 +223,28 @@ module DiscWriter(reset, clock, clken, mdat, maddr_inc, wrdata, wrgate, trkmark,
 	
 	// write pulse logic
 	reg	[7:0]	writetimer;
+	reg wrdata_stretched;
 	always @(posedge clock) begin
 		if (reset) begin
 			writetimer <= 1'b0;
-			wrdata <= 1'b1;
+			wrdata_stretched <= 1'b1;
 		end else if (clken) begin
 			if (wrdat_r == 1'b1) begin
-				writetimer <= 8'd60;				/// FIXME: Magic number.
-				wrdata <= 1'b0;
+				writetimer <= wd_width;		// Typically 60 = 600ns
+				wrdata_stretched <= 1'b0;
 			end else if (writetimer > 1'b0) begin
 				writetimer <= writetimer - 1'b1;
-				wrdata <= 1'b0;
+				wrdata_stretched <= 1'b0;
 			end else begin
 				writetimer <= 1'b0;
-				wrdata <= 1'b1;
+				wrdata_stretched <= 1'b1;
 			end
 		end
 	end
+	
+	// If write pulse width is zero, pass the write pulse straight through
+	// Otherwise stretch it
+	assign wrdata = (wd_width == 'd0) ? wrdat_r : wrdata_stretched;
 
 endmodule
 
